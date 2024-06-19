@@ -2,3 +2,4 @@
 *.sdf
 *.suo
 Build/MSVC12/Win32
+Build/MSVC12/.vs/NRage_Input_V2/v17/Browse.VC.opendb

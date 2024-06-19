@@ -1278,9 +1278,11 @@ bool StoreConfigToINI()
 	if (!g_ivConfig)
 		return false;
 
-	TCHAR szFilename[MAX_PATH];
-	GetDirectory(szFilename, DIRECTORY_DLL);
-	_tcscat(szFilename, _T("NRage.ini"));
+	PWSTR appdataFolder;
+	WCHAR szFilename[MAX_PATH] = L"";
+	SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataFolder);
+	_tcscat(szFilename, appdataFolder);
+	_tcscat(szFilename, _T("\\NRage.ini"));
 	FILE *fFile = _tfopen(szFilename, _T("wS"));	// write, optimize for sequential
 
 	if (!fFile)
@@ -1377,9 +1379,11 @@ bool LoadConfigFromINI()
 	DWORD dwSection = 0;	// this will eval to the bracketed "[Section]" we are currently in.
 	char szLine[4096];
 
-	TCHAR szFilename[MAX_PATH];
-	GetDirectory(szFilename, DIRECTORY_DLL);
-	_tcscat(szFilename, _T("NRage.ini"));
+	PWSTR appdataFolder;
+	WCHAR szFilename[MAX_PATH] = L"";
+	SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataFolder);
+	_tcscat(szFilename, appdataFolder);
+	_tcscat(szFilename, _T("\\NRage.ini"));
 	fFile = _tfopen(szFilename, _T("rS"));	// read, optimize for sequential
 
 	if (!fFile)
@@ -1417,9 +1421,11 @@ LANGID GetLanguageFromINI()
 	FILE *fFile = NULL;
 	char szLine[4096];
 
-	TCHAR szFilename[MAX_PATH];
-	GetDirectory(szFilename, DIRECTORY_DLL);
-	_tcscat(szFilename, _T("NRage.ini"));
+	PWSTR appdataFolder;
+	WCHAR szFilename[MAX_PATH] = L"";
+	SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataFolder);
+	_tcscat(szFilename, appdataFolder);
+	_tcscat(szFilename, _T("\\NRage.ini"));
 	fFile = _tfopen(szFilename, _T("rS"));	// read, optimize for sequential
 
 	if (!fFile)
