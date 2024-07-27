@@ -2,7 +2,6 @@
 // Microsoft Visual C++ generated include file.
 // Used by NRagePluginV2.rc
 //
-#define IDC_STATIC						-1
 #define IDC_STOREINDB                   3
 #define IDC_ERASEFROMDB                 4
 #define IDC_SAVEPROFILE                 5
@@ -205,6 +204,8 @@
 #define IDC_DEADZONE                    1033
 #define IDC_RUMBLE1                     1034
 #define IDC_YMODIFIER                   1034
+#define IDC_THRESHOLD2                  1034
+#define IDC_THRESHOLD                   1148
 #define IDC_RUMBLE2                     1035
 #define IDC_RUMBLE3                     1036
 #define IDC_RUMBLESTRENGTH              1037
@@ -217,6 +218,7 @@
 #define IDT_MSSENSITIVITY_X             1043
 #define IDT_DEADZONE                    1044
 #define IDT_RUMBLESTRENGTH              1045
+#define IDT_THRESHOLD                   1147
 #define IDT_MSSENSITIVITY_Y             1046
 #define IDT_MEMPAKSTATE                 1048
 #define IDT_RANGE                       1049
@@ -361,12 +363,14 @@
 #define IDC_XC_DPAD                     1193
 #define IDC_XC_LTS                      1194
 #define IDC_XC_RTS                      1195
+#define IDS_D_THRESHOLD                 1196
+#define IDC_STATIC                      -1
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        147
+#define _APS_NEXT_RESOURCE_VALUE        148
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1196
 #define _APS_NEXT_SYMED_VALUE           101

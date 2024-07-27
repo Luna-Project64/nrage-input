@@ -948,7 +948,7 @@ void CheckShortcuts()
 	{
 		for( int j = 0; j < SC_TOTAL; j++ ) 
 		{
-			bMatching = IsBtnPressed( g_scShortcuts.Player[i].aButtons[j] );
+			bMatching = IsBtnPressed( NULL, g_scShortcuts.Player[i].aButtons[j] );
 
 			if( bMatching && !bWasPressed[j][i] )
 				DoShortcut(i, j);
@@ -957,7 +957,7 @@ void CheckShortcuts()
 		}
 	}
 
-	bMatching = IsBtnPressed( g_scShortcuts.bMouseLock );
+	bMatching = IsBtnPressed( NULL, g_scShortcuts.bMouseLock );
 
 	if( bMatching && !bMLWasPressed )
 		DoShortcut(-1, -1); // controller -1 means do mouselock shortcut

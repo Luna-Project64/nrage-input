@@ -7,8 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include <windows.h>
-
+#include <windows.h>
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
@@ -25,7 +24,7 @@ LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_MAINCFGDIALOG, DIALOG
     BEGIN
@@ -113,6 +112,10 @@ BEGIN
         HORZGUIDE, 140
     END
 
+    IDD_PAK_ADAPTOID, DIALOG
+    BEGIN
+    END
+
     IDD_DEVICES, DIALOG
     BEGIN
         LEFTMARGIN, 7
@@ -121,6 +124,7 @@ BEGIN
         VERTGUIDE, 169
         TOPMARGIN, 7
         BOTTOMMARGIN, 173
+        HORZGUIDE, 124
     END
 
     IDD_MOD_MOVE, DIALOG
@@ -134,6 +138,14 @@ BEGIN
         RIGHTMARGIN, 288
         TOPMARGIN, 7
         BOTTOMMARGIN, 199
+    END
+
+    IDD_MOD_MACRO, DIALOG
+    BEGIN
+    END
+
+    IDD_MOD_CONFIG, DIALOG
+    BEGIN
     END
 
     "IDD_MAINCFGDIALOG$(_DEBUG)", DIALOG
@@ -371,9 +383,11 @@ BEGIN
     GROUPBOX        "Keyboard",IDC_STATIC,7,96,171,27
     CONTROL         "Absolute X",IDC_ACCELERATEX,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,107,50,10
     CONTROL         "Absolute Y",IDC_ACCELERATEY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,92,107,50,10
-    GROUPBOX        "GamePad",IDC_STATIC,7,124,171,38
+    GROUPBOX        "GamePad",IDC_STATIC,7,124,341,38
     CTEXT           "Deadzone PLACEHOLDER",IDT_DEADZONE,16,134,153,8
     CONTROL         "PLACEHOLDER",IDC_DEADZONE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,16,144,153,11
+    CTEXT           "Analog to Digital Threshold PLACEHOLDER",IDT_THRESHOLD,187,134,153,8
+    CONTROL         "PLACEHOLDER",IDC_THRESHOLD,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,187,144,153,11
 END
 
 IDD_PAK_TEXT DIALOGEX 0, 0, 356, 148
@@ -558,12 +572,14 @@ END
 
 IDR_PROFILE_DEFAULT1    PROFILE                 "configs\\Controller1.cpf"
 
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // SHORTCUT
 //
 
 IDR_SHORTCUTS_DEFAULT   SHORTCUT                "configs\\Shortcuts.sc"
+
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -592,17 +608,28 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_DEVICES AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // String Table
 //
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_ERR_DINOTFOUND      "dinput8.dll could not be found.\nPlease reinstall the latest version of DirectX."
     IDS_ERR_DICREATE        "Could not create DirectInput object."
     IDS_DLG_MPCHOOSE        "Choose a MemPak or type a new name to create one."
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_ERR_MPREAD          "Couldn't read MemPak."
     IDS_ERR_GBROM           "Can't open GB ROM file!"
@@ -622,13 +649,14 @@ BEGIN
     IDS_ERR_PROFREAD        "Couldn't read profile."
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_C_POLLING           "...Awaiting Input %i..."
     IDS_C_RANGE             "Range: %i%%"
     IDS_D_MSX               "Mouse Sensitivity X: %i%%"
     IDS_D_MSY               "Mouse Sensitivity Y: %i%%"
     IDS_D_DEADZONE          "Deadzone: %i%%"
+    IDS_D_THRESHOLD         "Analog to Digital Threshold: %i%%"
     IDS_D_RUMBLESTR         "Rumble Strength: %i%%"
     IDS_M_MOVEVALUE         "Movement Value: %i%%"
     IDS_M_TAB_NONE          "None"
@@ -642,7 +670,7 @@ BEGIN
     IDS_M_MACRO             "Macro"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_M_CONFIG            "Configuration"
     IDS_M_ASSIGNED          "Assigned to"
@@ -662,7 +690,7 @@ BEGIN
     IDS_P_ADAPTOID_NORAW    "The AdaptoidPak needs RawMode to be activated."
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_P_NONE_RAWNORAW     "No Pak inserted."
     IDS_P_MEM_NOCHANGE      "Can't change dir while running."
@@ -682,7 +710,7 @@ BEGIN
     IDS_DLG_SHORTCUTRESTORE "The shortcut configuration will be restored.\nAre you sure?"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_DLG_SHORTCUTRESTORE_TITLE "Restore default"
     IDS_C_GAMEPAD           "Gamepad: "
@@ -702,7 +730,7 @@ BEGIN
     IDS_DLG_ABOUT           "Help us translate N-Rage Input V2 into your language!"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_DLG_ABOUT_TITLE     "About N-Rage Input V2"
     IDS_ERR_NOINIT          "Plugin didn't get initialized!"
@@ -710,11 +738,11 @@ BEGIN
     IDS_POP_MOUSELOCKED     "Mouse Locked"
     IDS_POP_CHANGEPAK       "Player %i:\nPak changed to %s"
     IDS_ERR_MAPVIEW         "Couldn't MapViewOfFile"
-    IDS_DLG_CPF             "Controller Profile (*.cpf)\0*.cpf"
-    IDS_DLG_MPKN64          "MemPak (*.mpk)\0*.mpk\0Dexdrive Save (*.n64)\0*.n64"
-    IDS_DLG_A64             "MemPak Note (*.a64)\0*.a64"
-    IDS_DLG_GBGBC           "GameBoy ROM (*.gb;*.gbc)\0*.gb;*.gbc"
-    IDS_DLG_SVSAV           "GameBoy Save (*.sv;*.sav)\0*.sv;*.sav"
+    IDS_DLG_CPF             "Controller Profile (*.cpf)"
+    IDS_DLG_MPKN64          "MemPak (*.mpk)"
+    IDS_DLG_A64             "MemPak Note (*.a64)"
+    IDS_DLG_GBGBC           "GameBoy ROM (*.gb;*.gbc)"
+    IDS_DLG_SVSAV           "GameBoy Save (*.sv;*.sav)"
     IDS_ERR_HANDLER         "%s\n\n Error description: "
     IDS_ERR_MEM_NOSPEC      "No MemPak specified; please configure plugin."
     IDS_DLG_MEM_READONLY    "Mempak %s opened with read-only access.\nAfter exiting the game, the MemPak will NOT be saved."
@@ -723,7 +751,7 @@ BEGIN
                             "Bad AddressCRC detected!\nThis usually indicates a bad ROM.\n\nIgnore it and continue?"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_P_MEM_NOREGION      "None"
     IDS_P_MEM_BETA          "Beta"
@@ -743,7 +771,7 @@ BEGIN
     IDS_ERR_MEMPAK_NONOTES  "No free notes on MemPak (only 16 notes available per pak)."
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_ERR_NOTEEOF         "Error reading note file: unexpected end of file or read error."
     IDS_ERR_NOTEREAD        "Couldn't read note file."
@@ -752,7 +780,7 @@ BEGIN
     IDS_DLG_WARN_TITLE      "N-Rage Input V2 Warning"
     IDS_PLUGIN_TITLE        "N-Rage Input V2"
     IDS_ERR_MPCREATE        "Couldn't create MemPak."
-    IDS_DLG_SC              "Shortcuts File (*.sc)\0*.sc"
+    IDS_DLG_SC              "Shortcuts File (*.sc)"
     IDS_P_MEM_ERROR         "ErrorCode %lu: "
     IDS_P_R_NODEVICE        "None"
     IDS_P_TRANS_NOCHANGE    "Can't change paks while running"
@@ -777,7 +805,7 @@ LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_CHILE
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_XCONTROLS, DIALOG
     BEGIN

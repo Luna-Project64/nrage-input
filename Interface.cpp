@@ -883,6 +883,12 @@ BOOL CALLBACK DevicesTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 		SendMessage( hDlgItem, TBM_SETTICFREQ, (WPARAM) 10, 0 );
 		SendMessage( hDlgItem, TBM_SETPAGESIZE, (WPARAM) 0, 1 );
 
+		hDlgItem = GetDlgItem(hDlg, IDC_THRESHOLD);
+
+		SendMessage(hDlgItem, TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(0, 100));
+		SendMessage(hDlgItem, TBM_SETTICFREQ, (WPARAM)10, 0);
+		SendMessage(hDlgItem, TBM_SETPAGESIZE, (WPARAM)0, 1);
+
 		hDlgItem = GetDlgItem( hDlg, IDC_MSSENSITIVITY_X );
 
 		SendMessage( hDlgItem, TBM_SETRANGE, (WPARAM) TRUE, (LPARAM) MAKELONG( 0, 1000 ));
@@ -970,6 +976,12 @@ BOOL CALLBACK DevicesTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 			wsprintf( szBuffer, szTemp, pcController->bPadDeadZone );
 			SendMessage( GetDlgItem( hDlg, IDT_DEADZONE ), WM_SETTEXT , 0, (LPARAM)szBuffer );
 			return TRUE;
+		case IDC_THRESHOLD:
+			pcController->bPadThreshold = (BYTE)SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
+			LoadString(g_hResourceDLL, IDS_D_THRESHOLD, szTemp, DEFAULT_BUFFER);
+			wsprintf(szBuffer, szTemp, pcController->bPadThreshold);
+			SendMessage(GetDlgItem(hDlg, IDT_THRESHOLD), WM_SETTEXT, 0, (LPARAM)szBuffer);
+			return TRUE;
 		default:
 			return FALSE;
 		}
@@ -1009,6 +1021,11 @@ BOOL CALLBACK DevicesTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 		LoadString( g_hResourceDLL, IDS_D_DEADZONE, szTemp, DEFAULT_BUFFER );
 		wsprintf( szBuffer, szTemp, pcController->bPadDeadZone );
 		SendMessage( GetDlgItem( hDlg, IDT_DEADZONE ), WM_SETTEXT , 0, (LPARAM)szBuffer );
+
+		SendMessage( GetDlgItem( hDlg, IDC_THRESHOLD ), TBM_SETPOS, TRUE, pcController->bPadThreshold );
+		LoadString( g_hResourceDLL, IDS_D_THRESHOLD, szTemp, DEFAULT_BUFFER );
+		wsprintf( szBuffer, szTemp, pcController->bPadThreshold );
+		SendMessage( GetDlgItem( hDlg, IDT_THRESHOLD ), WM_SETTEXT, 0, (LPARAM)szBuffer );
 
 		SendMessage( GetDlgItem( hDlg, IDC_MSSENSITIVITY_X ), TBM_SETPOS, TRUE, pcController->wMouseSensitivityX );
 		LoadString( g_hResourceDLL, IDS_D_MSX, szTemp, DEFAULT_BUFFER );
@@ -3811,6 +3828,7 @@ void SetControllerDefaults( LPCONTROLLER pcController )
 	pcController->bRapidFireRate =		3; // Set default rapid fire rate here
 	pcController->bStickRange =			DEFAULT_STICKRANGE;
 	pcController->bPadDeadZone =		DEFAULT_DEADZONE;
+	pcController->bPadThreshold =		DEFAULT_THRESHOLD;
 	pcController->bRumbleTyp =			DEFAULT_RUMBLETYP;
 	pcController->bRumbleStrength =		DEFAULT_RUMBLESTRENGTH;
 	pcController->wMouseSensitivityX =	DEFAULT_MOUSESENSIVITY;

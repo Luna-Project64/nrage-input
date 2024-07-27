@@ -296,6 +296,9 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 		if (pController)
 			pController->bPadDeadZone = (BYTE)atoi(pszLine);
 		break;
+	case CHK_PADTHRESHOLD:
+		if (pController)
+			pController->bPadThreshold = (BYTE)atoi(pszLine);
 	case CHK_MOUSESENSITIVITYX:
 		if (pController)
 			pController->wMouseSensitivityX = (WORD)atoi(pszLine);
@@ -1494,6 +1497,7 @@ void DumpControllerSettings(FILE * fFile, int i, bool bIsINI)
 	fprintf(fFile, STRING_INI_KEYABSOLUTEX "=%u\n", g_ivConfig->Controllers[i].fKeyAbsoluteX);
 	fprintf(fFile, STRING_INI_KEYABSOLUTEY "=%u\n", g_ivConfig->Controllers[i].fKeyAbsoluteY);
 	fprintf(fFile, STRING_INI_PADDEADZONE "=%u\n", g_ivConfig->Controllers[i].bPadDeadZone);
+	fprintf(fFile, STRING_INI_PADTHRESHOLD "=%u\n", g_ivConfig->Controllers[i].bPadThreshold);
 	fprintf(fFile, STRING_INI_MOUSESENSX "=%u\n", g_ivConfig->Controllers[i].wMouseSensitivityX);
 	fprintf(fFile, STRING_INI_MOUSESENSY "=%u\n", g_ivConfig->Controllers[i].wMouseSensitivityY);
 	fprintf(fFile, STRING_INI_RUMBLETYPE "=%u\n", g_ivConfig->Controllers[i].bRumbleTyp);

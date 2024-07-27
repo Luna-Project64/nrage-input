@@ -38,7 +38,7 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData );
 
 BOOL CALLBACK EnumMakeDeviceList( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef );
 
-bool IsBtnPressed(BUTTON btnButton);
+bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton);
 bool GetInputDevice( HWND hWnd, LPDIRECTINPUTDEVICE8 &lpDirectInputDevice, GUID gGuid, DWORD dwDevType, DWORD dwCooperativeLevel );
 void ReleaseDevice( LPDIRECTINPUTDEVICE8 &lpDirectInputDevice );
 bool CreateEffectHandle( HWND hWnd, LPDIRECTINPUTDEVICE8 lpDirectInputDevice, LPDIRECTINPUTEFFECT &pDIEffect, BYTE bRumbleTyp, long lStrength );
@@ -56,9 +56,7 @@ HRESULT WriteAdaptoidPak( LPDIRECTINPUTDEVICE8 lpDirectInputDevice, DWORD addr, 
 #define MINAXISVALUE	-32768
 #define MAXAXISVALUE	32767
 #define ZEROVALUE		0
-#define THRESHOLD		90
 #define RANGERELATIVE	(MAXAXISVALUE - ZEROVALUE + 1)
-#define ABSTHRESHOLD	(RANGERELATIVE * THRESHOLD / 100)
 		// plus or minus this many 1/100 degrees counts as GetJoyPadPOV being pressed
 #define POVANGLETHRESH	5675
 

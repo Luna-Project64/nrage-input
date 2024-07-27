@@ -97,6 +97,7 @@ unsigned long djbHash(const char *str);
 #define STRING_INI_KEYABSOLUTEX	"KeyAbsoluteX"
 #define STRING_INI_KEYABSOLUTEY	"KeyAbsoluteY"
 #define STRING_INI_PADDEADZONE	"PadDeadZone"
+#define STRING_INI_PADTHRESHOLD "PadThreshold"
 #define STRING_INI_MOUSESENSX	"MouseSensitivityX"
 #define STRING_INI_MOUSESENSY	"MouseSensitivityY"
 #define STRING_INI_RUMBLETYPE	"RumbleType"
@@ -165,6 +166,7 @@ unsigned long djbHash(const char *str);
 #define CHK_KEYABSOLUTEX	958566277
 #define CHK_KEYABSOLUTEY	958566278
 #define CHK_PADDEADZONE		2913910084
+#define CHK_PADTHRESHOLD    2390993191
 #define CHK_MOUSESENSITIVITYX	1513071697
 #define CHK_MOUSESENSITIVITYY	1513071698
 #define CHK_RUMBLETYPE		3440038446

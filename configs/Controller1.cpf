@@ -11,6 +11,7 @@ AxisSet=0
 KeyAbsoluteX=0
 KeyAbsoluteY=0
 PadDeadZone=5
+PadThreshold=50
 MouseSensitivityX=100
 MouseSensitivityY=100
 RumbleType=1

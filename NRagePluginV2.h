@@ -41,6 +41,7 @@
 
 #define DEFAULT_STICKRANGE		66
 #define DEFAULT_DEADZONE		5
+#define DEFAULT_THRESHOLD       50
 #define DEFAULT_RUMBLETYP		RUMBLE_EFF1
 #define DEFAULT_RUMBLESTRENGTH	80
 #define DEFAULT_MOUSESENSIVITY	100
@@ -159,6 +160,7 @@ typedef struct _CONTROLLER		// AN N64 CONTROLLER
 	WORD wMouseSensitivityX;		// set per N64 controller, that's OK
 	WORD wMouseSensitivityY;
 	BYTE bPadDeadZone;				// our manual dead zone, set per N64 controller
+	BYTE bPadThreshold;
 	BYTE bRumbleStrength;			// set per N64 controller
 	unsigned short nModifiers;		// number of modifiers
 

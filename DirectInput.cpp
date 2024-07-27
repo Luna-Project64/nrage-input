@@ -150,7 +150,7 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 	{
 		BUTTON btnButton = pcController->pModifiers[i].btnButton;
 
-		b_Value = IsBtnPressed( btnButton );
+		b_Value = IsBtnPressed( pcController, btnButton );
 
 		bool fChangeMod = false;
 
@@ -300,7 +300,7 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 	{
 		BUTTON btnButton = pcController->aButton[i];
 
-		b_Value = IsBtnPressed( btnButton );
+		b_Value = IsBtnPressed( pcController, btnButton );
 
 		w_Buttons |= (((WORD)b_Value) << i);
 	} // END N64 BUTTONS for
@@ -1236,10 +1236,18 @@ void InitMouse()
 }
 
 // treat btnButton as a b_Value, and return whether it is pressed or not
-bool IsBtnPressed(BUTTON btnButton)
+bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton)
 {
 	long l_Value;
 	LPLONG plRawState = (LPLONG)&btnButton.parentDevice->stateAs.joyState;
+
+	long AbsThreshold;
+	if (pcController) {
+		AbsThreshold = (RANGERELATIVE * pcController->bPadThreshold / 100);
+	}
+	else {
+		AbsThreshold = (RANGERELATIVE * 90 / 100);
+	}
 
 	switch ( btnButton.bBtnType )
 	{
@@ -1251,9 +1259,9 @@ bool IsBtnPressed(BUTTON btnButton)
 		l_Value = plRawState[btnButton.bOffset] - ZEROVALUE;
 
 		if ( btnButton.bAxisID )
-			return ( l_Value <= -ABSTHRESHOLD );
+			return ( l_Value <= -AbsThreshold );
 		else
-			return ( l_Value >= ABSTHRESHOLD );
+			return ( l_Value >= AbsThreshold );
 
 	case DT_JOYPOV:
 		return GetJoyPadPOV( (PDWORD)&plRawState[btnButton.bOffset] , btnButton.bAxisID );
