@@ -1243,7 +1243,7 @@ bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton)
 
 	long AbsThreshold;
 	if (pcController) {
-		AbsThreshold = (RANGERELATIVE * pcController->bPadThreshold / 100);
+		AbsThreshold = (MAXAXISVALUE * pcController->bPadThreshold / 100);
 	}
 	else {
 		AbsThreshold = (RANGERELATIVE * 90 / 100);
