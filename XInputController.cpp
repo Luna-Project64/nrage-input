@@ -215,22 +215,24 @@ void GetXInputControllerKeys( const int indexController, LPDWORD Keys )
 	valButtons |= state.Gamepad.bLeftTrigger > 30 ? gController->stAnalogs.iLeftTrigger : 0;
 	valButtons |= state.Gamepad.bRightTrigger > 30 ? gController->stAnalogs.iRightTrigger : 0;
 
-	if (LX >= BUTTON_ANALOG_VALUE)
+	short buttonAnalogThreshold = pcController->bPadThreshold == 0 ? BUTTON_ANALOG_VALUE : pcController->bPadThreshold * N64_ANALOG_MAX / 100;
+
+	if (LX >= buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iLXAxis & ((CRight | DRight) << 16) ? gController->stAnalogs.iLXAxis >> 16 : 0;
-	if (LX <= -BUTTON_ANALOG_VALUE)
+	if (LX <= -buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iLXAxis & (CLeft | DLeft) ? gController->stAnalogs.iLXAxis : 0;
-	if (LY >= BUTTON_ANALOG_VALUE)
+	if (LY >= buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iLYAxis & ((CUp | DUp) << 16) ? gController->stAnalogs.iLYAxis >> 16 : 0;
-	if (LY <= -BUTTON_ANALOG_VALUE)
+	if (LY <= -buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iLYAxis & (CDown | DDown) ? gController->stAnalogs.iLYAxis : 0;
 
-	if (RX >= BUTTON_ANALOG_VALUE)
+	if (RX >= buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iRXAxis & ((CRight | DRight) << 16) ? gController->stAnalogs.iRXAxis >> 16 : 0;
-	if (RX <= -BUTTON_ANALOG_VALUE)
+	if (RX <= -buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iRXAxis & (CLeft | DLeft) ? gController->stAnalogs.iRXAxis : 0;
-	if (RY >= BUTTON_ANALOG_VALUE)
+	if (RY >= buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iRYAxis & ((CUp | DUp) << 16) ? gController->stAnalogs.iRYAxis >> 16 : 0;
-	if (RY <= -BUTTON_ANALOG_VALUE)
+	if (RY <= -buttonAnalogThreshold)
 		valButtons |= gController->stAnalogs.iRYAxis & (CDown | DDown) ? gController->stAnalogs.iRYAxis : 0;
 
 	if (gController->stAnalogs.iLXAxis == XAxis)
