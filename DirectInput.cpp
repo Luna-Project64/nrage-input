@@ -354,48 +354,16 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 			break;
 
 		case DT_KEYBUTTON:
+			// deleted a bunch of stuff hereish, won't even pretend to understand how it worked ~N3
 			if( btnButton.parentDevice->stateAs.rgbButtons[btnButton.bOffset] & 0x80 )
 			{
 				b_Value = true;
 
-				if(( pcController->fKeyAbsoluteX && i < 2 )
-					|| ( pcController->fKeyAbsoluteY &&  i > 1 ))
-				{
-					if( pcController->wAxeBuffer[i] < MAXAXISVALUE )
-					{
-						l_Value = pcController->wAxeBuffer[i] = min(( pcController->wAxeBuffer[i] + N64DIVIDER*3), MAXAXISVALUE );
-					}
-					else
-						l_Value = MAXAXISVALUE;
-				}
-				else
-				{
-					if( pcController->wAxeBuffer[i] < MAXAXISVALUE )
-					{
-						l_Value = pcController->wAxeBuffer[i] = min(( pcController->wAxeBuffer[i] * 2 + N64DIVIDER*5 ), MAXAXISVALUE );
-					}
-					else
-						l_Value = MAXAXISVALUE;
-				}
+				l_Value = MAXAXISVALUE;
 			}
 			else
 			{
-				if(( pcController->fKeyAbsoluteX && i < 2 )
-					|| ( pcController->fKeyAbsoluteY && i > 1 ))
-				{
-					l_Value = pcController->wAxeBuffer[i];
-					b_Value = true;
-				}
-				else
-				{
-					if( pcController->wAxeBuffer[i] > N64DIVIDER )
-					{
-						b_Value = true;
-						l_Value = pcController->wAxeBuffer[i] = pcController->wAxeBuffer[i] / 2 ;
-					}
-					else
-						b_Value = false;
-				}
+				b_Value = false;
 			}
 			break;
 
