@@ -1,10 +1,14 @@
-NRage input plugin -- unofficial version 2.5
+NRage input plugin -- "2.4.4 (LPJ64 fork)"
 ============================================
 
-This is libertyernie's UNOFFICIAL fork of the NRage input plugin, hosted at: https://github.com/libertyernie/nrage-input
-(originally from: https://nragev20.svn.sourceforge.net/svnroot/nragev20/trunk)
+This is the UNOFFICIAL fork of the NRage input plugin used in Luna's Project64, based on libertyernie's 2.4 fork.
+hosted at: https://github.com/Luna-Project64/nrage-input
+libertyernie's fork hosted at: https://github.com/libertyernie/nrage-input
+original NRage hosted at: https://nragev20.svn.sourceforge.net/svnroot/nragev20/trunk
 
-Changes in this version:
+Builds of this plugin are currently released with the Luna's Project64 emulator, with changes being listed in README.txt.
+
+Changes made by libertyernie's fork:
 * Games with MBC5 RAM (including Pokemon Yellow) should now be written to correctly - reading was already working
 * Support added for using a save file from Goomba Color (GBC emulator for GBA) instead of a raw GBC save file. The GBC SRAM will be extracted on open and replaced on close.
   * If you have one Goomba Color SRAM file with more than one GBC game's save data, you can use that same SRAM file for multiple games at once (e.g. Pokemon Blue on P1, Pokemon Gold on P2)
