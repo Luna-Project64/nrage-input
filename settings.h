@@ -25,7 +25,7 @@
 #define _SETTINGS_H_
 
 #define DIRECTINPUT_VERSION 0x0800
-#define VERSIONNUMBER		"2.4(fork)"
+#define VERSIONNUMBER		"2.5(fork)"
 
 	// hacks for GNU C compilers
 #ifdef __GNUC__
