@@ -635,7 +635,11 @@ BOOL CALLBACK EnumGetEffectTypes( LPCDIEFFECTINFO pdei, LPVOID pvRef )
 // EnumMakeDeviceList has been rewritten. --rabid
 BOOL CALLBACK EnumMakeDeviceList( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef )
 {
-	if( IsXInputDevice( &lpddi->guidProduct ) )		// Check if is XInput device --tecnicors
+	MakeDeviceCtx* pctx = (MakeDeviceCtx*) pvRef;
+	if (pctx->acquired)
+		pctx->data = GetXInputDevices();
+
+	if( IsXInputDevice( pctx->data, &lpddi->guidProduct ) )		// Check if is XInput device --tecnicors
         return DIENUM_CONTINUE;
 
 	if (IsEqualGUID(g_sysMouse.guidInstance, lpddi->guidInstance))
@@ -672,7 +676,7 @@ BOOL CALLBACK EnumMakeDeviceList( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef )
 		else
 			g_devList[g_nDevices].bEffType = RUMBLE_NONE;
 
-		if ( GetInputDevice(g_strEmuInfo.hMainWindow, g_devList[g_nDevices].didHandle, lpddi->guidInstance, lpddi->dwDevType, DIB_DEVICE) )
+		if ( GetInputDevice(g_strEmuInfo.hMainWindow, g_devList[g_nDevices].didHandle, lpddi->guidInstance, lpddi->dwDevType, lpddi, DIB_DEVICE) )
 		{
 			g_devList[g_nDevices].didHandle->EnumEffects( EnumGetEffectTypes, &g_devList[g_nDevices].bEffType, DIEFT_ALL );		
 			g_nDevices++;
@@ -724,7 +728,7 @@ BOOL CALLBACK EnumSetObjectsAxis( LPCDIDEVICEOBJECTINSTANCE lpddoi, LPVOID pvRef
 //		sets its cooperative level
 //		for joysticks, calls EnumSetObjectsAxis for each axis
 // GetInputDevice always leaves the returned device in an UNACQUIRED state.
-bool GetInputDevice( HWND hWnd, LPDIRECTINPUTDEVICE8 &lpDirectInputDevice, GUID gGuid, DWORD dwDevType, DWORD dwCooperativeLevel )
+bool GetInputDevice(HWND hWnd, LPDIRECTINPUTDEVICE8& lpDirectInputDevice, GUID gGuid, DWORD dwDevType, LPCDIDEVICEINSTANCE lpddi /*nullable if unavailable*/, DWORD dwCooperativeLevel)
 {
 	DebugWriteA("GetInputDevice: gGuid is {%08.8lX-%04.4hX-%04.4hX-%02.2X%02.2X-%02.2X%02.2X%02.2X%02.2X%02.2X%02.2X}\n", gGuid.Data1, gGuid.Data2, gGuid.Data3, gGuid.Data4[0], gGuid.Data4[1], gGuid.Data4[2], gGuid.Data4[3], gGuid.Data4[4], gGuid.Data4[5], gGuid.Data4[6], gGuid.Data4[7]);
 	if( lpDirectInputDevice != NULL)
@@ -770,7 +774,14 @@ bool GetInputDevice( HWND hWnd, LPDIRECTINPUTDEVICE8 &lpDirectInputDevice, GUID 
 	VOID* aRef[2] = { &gGuid, &bDeviceAvailable };
 		
 	// for each available device in our dwDevType category, run EnumIsDeviceAvailable with params "aRef"
-	g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumIsDeviceAvailable, (LPVOID)aRef, DIEDFL_ATTACHEDONLY );
+	if (lpddi)
+	{
+		bDeviceAvailable = TRUE;
+	}
+	else
+	{
+		g_pDIHandle->EnumDevices(DI8DEVCLASS_ALL, EnumIsDeviceAvailable, (LPVOID)aRef, DIEDFL_ATTACHEDONLY);
+	}
 		
 	if( !bDeviceAvailable )
 	{
@@ -794,8 +805,10 @@ bool GetInputDevice( HWND hWnd, LPDIRECTINPUTDEVICE8 &lpDirectInputDevice, GUID 
 	else
 		DebugWriteA("GetInputDevice: CreateDevice failed\n");
 
-	if( Success && ( ppDiDataFormat == &c_dfDIJoystick ))
-		lpDirectInputDevice->EnumObjects( EnumSetObjectsAxis, lpDirectInputDevice, DIDFT_AXIS );
+	if (Success && (ppDiDataFormat == &c_dfDIJoystick))
+	{
+		lpDirectInputDevice->EnumObjects(EnumSetObjectsAxis, lpDirectInputDevice, DIDFT_AXIS);
+	}
 
 	return Success;
 }
@@ -1000,7 +1013,7 @@ bool PrepareInputDevices()
 		}
 
 		ReleaseEffect( g_apdiEffect[i] );
-		if( g_pcControllers[i].guidFFDevice != GUID_NULL && GetInputDevice( g_strEmuInfo.hMainWindow, g_apFFDevice[i], g_pcControllers[i].guidFFDevice, DI8DEVTYPE_JOYSTICK, DIB_FF )) // not necessarily a joystick type device, but we don't use the data anyway
+		if( g_pcControllers[i].guidFFDevice != GUID_NULL && GetInputDevice( g_strEmuInfo.hMainWindow, g_apFFDevice[i], g_pcControllers[i].guidFFDevice, DI8DEVTYPE_JOYSTICK, nullptr, DIB_FF )) // not necessarily a joystick type device, but we don't use the data anyway
 		{
 			DIDEVICEINSTANCE diDev;
 			diDev.dwSize = sizeof( DIDEVICEINSTANCE );
@@ -1036,7 +1049,7 @@ bool PrepareInputDevices()
 	{
 		if( !g_sysMouse.didHandle )
 		{
-			if( GetInputDevice( g_strEmuInfo.hMainWindow, g_sysMouse.didHandle, GUID_SysMouse, DI8DEVTYPE_MOUSE, g_bExclusiveMouse ? DIB_MOUSE : DIB_KEYBOARD ))
+			if( GetInputDevice( g_strEmuInfo.hMainWindow, g_sysMouse.didHandle, GUID_SysMouse, DI8DEVTYPE_MOUSE, nullptr, g_bExclusiveMouse ? DIB_MOUSE : DIB_KEYBOARD ))
 			{
 				AcquireDevice( g_sysMouse.didHandle );
 			}
@@ -1193,7 +1206,7 @@ BYTE GetAdaptoidStatus( LPDIRECTINPUTDEVICE8 lpDirectInputDevice )
 // Fill the handle for g_sysMouse properly
 void InitMouse()
 {
-	if (GetInputDevice( g_strEmuInfo.hMainWindow, g_sysMouse.didHandle, GUID_SysMouse, DI8DEVTYPE_MOUSE, DIB_KEYBOARD ))
+	if (GetInputDevice( g_strEmuInfo.hMainWindow, g_sysMouse.didHandle, GUID_SysMouse, DI8DEVTYPE_MOUSE, nullptr, DIB_KEYBOARD ))
 	{
 		g_sysMouse.guidInstance = GUID_SysMouse;
 		g_sysMouse.dwDevType = DI8DEVTYPE_MOUSE;

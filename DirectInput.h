@@ -26,6 +26,8 @@
 
 #include <dinput.h>
 
+#include <set>
+
 extern LPDIRECTINPUT8 g_pDIHandle;
 
 
@@ -36,10 +38,16 @@ void InitMouse();
 void GetDeviceDatas();
 bool GetNControllerInput ( const int indexController, LPDWORD pdwData );
 
+struct MakeDeviceCtx
+{
+	bool acquired = false;
+	std::set<DWORD> data;
+};
+
 BOOL CALLBACK EnumMakeDeviceList( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef );
 
 bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton);
-bool GetInputDevice( HWND hWnd, LPDIRECTINPUTDEVICE8 &lpDirectInputDevice, GUID gGuid, DWORD dwDevType, DWORD dwCooperativeLevel );
+bool GetInputDevice( HWND hWnd, LPDIRECTINPUTDEVICE8 &lpDirectInputDevice, GUID gGuid, DWORD dwDevType, LPCDIDEVICEINSTANCE lpddi /*nullable if unavailable*/, DWORD dwCooperativeLevel);
 void ReleaseDevice( LPDIRECTINPUTDEVICE8 &lpDirectInputDevice );
 bool CreateEffectHandle( HWND hWnd, LPDIRECTINPUTDEVICE8 lpDirectInputDevice, LPDIRECTINPUTEFFECT &pDIEffect, BYTE bRumbleTyp, long lStrength );
 void ReleaseEffect( LPDIRECTINPUTEFFECT &lpDirectEffect );

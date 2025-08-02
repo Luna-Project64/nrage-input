@@ -31,6 +31,7 @@
 //code from http://msdn.microsoft.com/en-us/library/ee417014(VS.85).aspx
 #include <wbemidl.h>
 #include <oleauto.h>
+#include <set>
 //#include <wmsstd.h> <-- only needed for SAFE_RELEASE(x)
 
 #ifndef SAFE_RELEASE		// when Windows Media Device M? is not present
@@ -47,7 +48,9 @@
 // "IG_" (ex. "VID_045E&PID_028E&IG_00").  If it does, then it's an XInput device
 // Unfortunately this information can not be found by just using DirectInput 
 //-----------------------------------------------------------------------------
-BOOL IsXInputDevice( const GUID* pGuidProductFromDirectInput );
+std::set<DWORD> GetXInputDevices(void);
+static inline BOOL IsXInputDevice( std::set<DWORD> devices, const GUID* pGuidProductFromDirectInput )
+{ return devices.find(pGuidProductFromDirectInput->Data1) != devices.end(); }
 //END conde from ...
 
 /*

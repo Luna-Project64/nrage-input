@@ -2618,7 +2618,7 @@ BOOL CALLBACK RumblePakProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam 
 		}
 		else
 		{
-			if (! GetInputDevice( g_hMainDialog, g_pConfigDevice, g_devList[j].guidInstance, g_devList[j].dwDevType, DIB_FF ) )
+			if (! GetInputDevice( g_hMainDialog, g_pConfigDevice, g_devList[j].guidInstance, g_devList[j].dwDevType, nullptr, DIB_FF ) )
 			{
 				g_pConfigDevice = NULL;
 				DebugWriteA("Could not GetInputDevice in user update, RumblePakProc.\n");

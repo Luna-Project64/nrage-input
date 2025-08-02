@@ -26,7 +26,7 @@
 #include "resource.h"
 #include <stdio.h>
 
-BOOL IsXInputDevice( const GUID* pGuidProductFromDirectInput )
+std::set<DWORD> GetXInputDevices( void )
 {
     IWbemLocator*           pIWbemLocator  = NULL;
     IEnumWbemClassObject*   pEnumDevices   = NULL;
@@ -40,6 +40,7 @@ BOOL IsXInputDevice( const GUID* pGuidProductFromDirectInput )
     UINT                    iDevice        = 0;
     VARIANT                 var;
     HRESULT                 hr;
+	std::set<DWORD>			xinputDevices;
 
     // CoInit if needed
     hr = CoInitialize(NULL);
@@ -105,11 +106,7 @@ BOOL IsXInputDevice( const GUID* pGuidProductFromDirectInput )
 
 						// Compare the VID/PID to the DInput device
 						DWORD dwVidPid = MAKELONG( dwVid, dwPid );
-						if( dwVidPid == pGuidProductFromDirectInput->Data1 )
-						{
-							bIsXinputDevice = true;
-							goto LCleanup;
-						}
+						xinputDevices.insert(dwVidPid);
 					}
 				}
 				VariantClear(&var);
@@ -134,7 +131,7 @@ LCleanup:
     if( bCleanupCOM )
         CoUninitialize();
 
-    return bIsXinputDevice;
+    return xinputDevices;
 }
 
 void AxisDeadzone( SHORT &AxisValue, long  lDeadZoneValue, float fDeadZoneRelation )

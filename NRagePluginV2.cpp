@@ -211,7 +211,8 @@ EXPORT void CALL DllConfig ( HWND hParent )
 		{
 			EnterCriticalSection ( &g_critical );
 			InitMouse();
-			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, NULL, DIEDFL_ATTACHEDONLY );
+			MakeDeviceCtx ctx;
+			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, &ctx, DIEDFL_ATTACHEDONLY );
 			LeaveCriticalSection ( &g_critical );
 			DebugWriteA("InitDirectInput run in DllConfig, g_nDevices=%d\n", g_nDevices);
 		}
@@ -340,7 +341,8 @@ EXPORT void CALL InitiateControllers (CONTROL_INFO ControlInfo)
 		{
 			EnterCriticalSection ( &g_critical );
 			InitMouse();
-			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, NULL, DIEDFL_ATTACHEDONLY );
+			MakeDeviceCtx ctx;
+			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, &ctx, DIEDFL_ATTACHEDONLY );
 			LeaveCriticalSection ( &g_critical );
 			DebugWriteA("InitDirectInput run in InitiateControllers, g_nDevices=%d\n", g_nDevices);
 		}
