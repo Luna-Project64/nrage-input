@@ -2525,13 +2525,13 @@ BOOL CALLBACK RumblePakProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam 
 				{
 					switch (hRslt)
 					{
-					case DIERR_INCOMPLETEEFFECT:
+					case (HRESULT) DIERR_INCOMPLETEEFFECT:
 						DebugWriteA("Test Rumble: DIError: incomplete effect.\n");
 						break;
 					case DIERR_INVALIDPARAM:
 						DebugWriteA("Test Rumble: DIError: invalid param.\n");
 						break;
-					case DIERR_NOTEXCLUSIVEACQUIRED:
+					case (HRESULT) DIERR_NOTEXCLUSIVEACQUIRED:
 						DebugWriteA("Test Rumble: DIError: not exclusive acquired.\n");
 						break;
 					case DIERR_NOTINITIALIZED:
