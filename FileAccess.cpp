@@ -1272,6 +1272,8 @@ bool WriteMemPakFile( TCHAR *pszMemPakFile, BYTE *aMemPak, bool fCreate )
 	return false;
 }
 
+extern char gPluginConfigDir[MAX_PATH];
+
 // This func stores the current config data to INI.  It stores the Interface's idea of configuration
 // As such, it should only be called from the config window (Interface). Otherwise, it will fail.
 // Returns true if saved OK, false if there was a problem.
@@ -1281,10 +1283,20 @@ bool StoreConfigToINI()
 	if (!g_ivConfig)
 		return false;
 
-	PWSTR appdataFolder;
-	WCHAR szFilename[MAX_PATH] = L"";
-	SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataFolder);
-	_tcscat(szFilename, appdataFolder);
+	TCHAR szFilename[MAX_PATH]{};
+	if (*gPluginConfigDir)
+	{
+		strcpy_s(szFilename, gPluginConfigDir);
+	}
+	else
+	{
+		SHGetFolderPath(NULL,
+			CSIDL_APPDATA,
+			NULL,
+			0,
+			szFilename);
+	}
+
 	_tcscat(szFilename, _T("\\NRage.ini"));
 	FILE *fFile = _tfopen(szFilename, _T("wS"));	// write, optimize for sequential
 
@@ -1382,10 +1394,20 @@ bool LoadConfigFromINI()
 	DWORD dwSection = 0;	// this will eval to the bracketed "[Section]" we are currently in.
 	char szLine[4096];
 
-	PWSTR appdataFolder;
-	WCHAR szFilename[MAX_PATH] = L"";
-	SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataFolder);
-	_tcscat(szFilename, appdataFolder);
+	TCHAR szFilename[MAX_PATH]{};
+	if (*gPluginConfigDir)
+	{
+		strcpy_s(szFilename, gPluginConfigDir);
+	}
+	else
+	{
+		SHGetFolderPath(NULL,
+			CSIDL_APPDATA,
+			NULL,
+			0,
+			szFilename);
+	}
+
 	_tcscat(szFilename, _T("\\NRage.ini"));
 	fFile = _tfopen(szFilename, _T("rS"));	// read, optimize for sequential
 
@@ -1424,10 +1446,20 @@ LANGID GetLanguageFromINI()
 	FILE *fFile = NULL;
 	char szLine[4096];
 
-	PWSTR appdataFolder;
-	WCHAR szFilename[MAX_PATH] = L"";
-	SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataFolder);
-	_tcscat(szFilename, appdataFolder);
+	TCHAR szFilename[MAX_PATH]{};
+	if (*gPluginConfigDir)
+	{
+		strcpy_s(szFilename, gPluginConfigDir);
+	}
+	else
+	{
+		SHGetFolderPath(NULL,
+			CSIDL_APPDATA,
+			NULL,
+			0,
+			szFilename);
+	}
+
 	_tcscat(szFilename, _T("\\NRage.ini"));
 	fFile = _tfopen(szFilename, _T("rS"));	// read, optimize for sequential
 

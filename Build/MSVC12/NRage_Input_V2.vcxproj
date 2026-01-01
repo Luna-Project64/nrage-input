@@ -20,13 +20,13 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <PlatformToolset>ClangCL</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -106,9 +106,10 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <CallingConvention>FastCall</CallingConvention>
       <OmitFramePointers>true</OmitFramePointers>
+      <AdditionalOptions>/Gw -fmerge-all-constants -flto=thin -fsplit-lto-unit -fwhole-program-vtables -mssse3 -Ofast /clang:-fno-math-errno %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalOptions>/MACHINE:I386 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/opt:lldltojobs=all -mllvm:-disable-auto-upgrade-debug-info /call-graph-profile-sort /opt:lldlto=3 /MACHINE:I386 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>xinput.lib;unicows.lib;odbc32.lib;odbccp32.lib;dinput8.lib;dxguid.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)NRage_Input_V2.dll</OutputFile>
       <OptimizeReferences>true</OptimizeReferences>
