@@ -7,7 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include <windows.h>
+#include "afxres.h"
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
@@ -154,6 +154,11 @@ BEGIN
         RIGHTMARGIN, 389
         TOPMARGIN, 7
         BOTTOMMARGIN, 344
+    END
+
+    IDD_MOD_LUNA, DIALOG
+    BEGIN
+        BOTTOMMARGIN, 29
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -525,6 +530,13 @@ BEGIN
     PUSHBUTTON      "Test Rumble",IDC_RUMBLETEST,221,59,73,28,WS_DISABLED | WS_GROUP
 END
 
+IDD_MOD_LUNA DIALOGEX 0, 0, 153, 99
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD
+FONT 8, "MS Shell Dlg", 0, 0, 0x0
+BEGIN
+    COMBOBOX        IDC_COMBO_LUNA,0,6,153,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -616,6 +628,11 @@ BEGIN
     0
 END
 
+IDD_MOD_LUNA AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -656,11 +673,12 @@ BEGIN
     IDS_D_MSX               "Mouse Sensitivity X: %i%%"
     IDS_D_MSY               "Mouse Sensitivity Y: %i%%"
     IDS_D_DEADZONE          "Deadzone: %i%%"
-    IDS_D_THRESHOLD         "Analog to Digital Threshold: %i%%"
+	IDS_D_THRESHOLD         "Analog to Digital Threshold: %i%%"
     IDS_D_RUMBLESTR         "Rumble Strength: %i%%"
     IDS_M_MOVEVALUE         "Movement Value: %i%%"
     IDS_M_TAB_NONE          "None"
     IDS_M_TAB_MOVE          "Move"
+    IDS_M_TAB_LUNA          "Luna"
     IDS_M_TAB_MACRO         "Macro"
     IDS_M_TAB_CONFIG        "Config"
     IDS_M_MOUSE_PREFIX      "Ms-"

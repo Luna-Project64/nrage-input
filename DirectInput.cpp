@@ -28,6 +28,7 @@
 #include "PakIO.h"
 #include "DirectInput.h"
 #include "XInputController.h"
+#include "Luna.h"
 #include <math.h>
 
 // ProtoTypes //
@@ -170,6 +171,11 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 					fChangeMod = true;
 			}
 		}
+		else if (pcController->pModifiers[i].bModType == MDT_LUNA)
+		{
+			if (b_Value != (bool)(btnButton.fPrevPressed))
+				fChangeMod = true;
+		}
 		else
 		{ // Move / Macro Type
 			if( pcController->pModifiers[i].fToggle )
@@ -288,6 +294,33 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 					pcController->fKeyAbsoluteY = !pcController->fKeyAbsoluteY;
 			}
 				break;
+
+			case MDT_LUNA:
+			{
+				int arg = pcController->pModifiers[i].dwSpecific;
+				if (Luna::gExCommandHandler)
+				{
+					switch (arg)
+					{
+					case LUNAEX_LOAD_STATE:
+						if (b_Value)
+							Luna::gExCommandHandler(Luna::gMainWindow, LUNA_EXCMD_LOAD_STATE);
+						break;
+					case LUNAEX_SAVE_STATE:
+						if (b_Value)
+							Luna::gExCommandHandler(Luna::gMainWindow, LUNA_EXCMD_SAVE_STATE);
+						break;
+					case LUNAEX_TOGGLE_FPS:
+						if (b_Value)
+							Luna::gExCommandHandler(Luna::gMainWindow, LUNA_EXCMD_UNLOCK_FPS);
+						else
+							Luna::gExCommandHandler(Luna::gMainWindow, LUNA_EXCMD_LOCK_FPS);
+
+						break;
+					}
+				}
+				break;
+			}
 			}
 		}
 

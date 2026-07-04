@@ -23,6 +23,7 @@
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <PlatformToolset>ClangCL</PlatformToolset>
+    <LLVMToolsVersion>22</LLVMToolsVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -136,6 +137,7 @@
     <ClCompile Include="..\..\goombasav\minilzo-2.06\minilzo.c" />
     <ClCompile Include="..\..\Interface.cpp" />
     <ClCompile Include="..\..\International.cpp" />
+    <ClCompile Include="..\..\Luna.cpp" />
     <ClCompile Include="..\..\NRagePluginV2.cpp" />
     <ClCompile Include="..\..\PakIO.cpp" />
     <ClCompile Include="..\..\XInputController.cpp" />
@@ -154,6 +156,7 @@
     <ClInclude Include="..\..\goombasav\minilzo-2.06\minilzo.h" />
     <ClInclude Include="..\..\Interface.h" />
     <ClInclude Include="..\..\International.h" />
+    <ClInclude Include="..\..\Luna.h" />
     <ClInclude Include="..\..\NRagePluginV2.h" />
     <ClInclude Include="..\..\PakIO.h" />
     <ClInclude Include="..\..\resource.h" />

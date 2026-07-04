@@ -36,6 +36,7 @@
 #define IDS_ERR_GBROM                   145
 #define IDD_XCONTROLS                   145
 #define IDS_ERR_GBSRAMERR               146
+#define IDD_MOD_LUNA                    146
 #define IDS_VERSTRING                   147
 #define IDS_TAB_CONTROLLER              148
 #define IDS_TAB_SHORTCUTS               149
@@ -162,6 +163,7 @@
 #define IDS_DLG_TPAK_READONLY           267
 #define IDS_STRING268                   268
 #define IDS_P_SWITCHING                 268
+#define IDS_M_TAB_LUNA                  269
 #define IDC_ROMDESC                     1003
 #define IDC_ROMCONFIG                   1004
 #define IDC_AUTOCONFIG                  1005
@@ -205,7 +207,6 @@
 #define IDC_RUMBLE1                     1034
 #define IDC_YMODIFIER                   1034
 #define IDC_THRESHOLD2                  1034
-#define IDC_THRESHOLD                   1148
 #define IDC_RUMBLE2                     1035
 #define IDC_RUMBLE3                     1036
 #define IDC_RUMBLESTRENGTH              1037
@@ -218,7 +219,6 @@
 #define IDT_MSSENSITIVITY_X             1043
 #define IDT_DEADZONE                    1044
 #define IDT_RUMBLESTRENGTH              1045
-#define IDT_THRESHOLD                   1147
 #define IDT_MSSENSITIVITY_Y             1046
 #define IDT_MEMPAKSTATE                 1048
 #define IDT_RANGE                       1049
@@ -329,6 +329,8 @@
 #define IDC_RAPIDFIRERATE               1145
 #define IDC_SETRUMBLEPAK_P4             1146
 #define IDC_RAPIDFIREMODERATE           1146
+#define IDT_THRESHOLD                   1147
+#define IDC_THRESHOLD                   1148
 #define IDC_SETTRANSFERPAK_P4           1148
 #define IDC_DEADPANMOUSEY               1148
 #define IDC_BUFFEREDMOUSEY              1149
@@ -343,6 +345,7 @@
 #define IDC_SETDEFAULTSC                1156
 #define IDC_SAVESHORTCUTS               1157
 #define IDC_COMBO1                      1158
+#define IDC_COMBO_LUNA                  1158
 #define IDC_LANGUAGE                    1160
 #define IDC_SHOWMESSAGES                1162
 #define IDC_XC_USE                      1178
@@ -370,7 +373,7 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        148
+#define _APS_NEXT_RESOURCE_VALUE        149
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1196
 #define _APS_NEXT_SYMED_VALUE           101

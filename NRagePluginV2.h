@@ -114,6 +114,14 @@ typedef struct _MODIFIER
 #define MDT_MOVE		1
 #define MDT_MACRO		2
 #define MDT_CONFIG		3
+#define MDT_LUNA        4
+
+enum LunaEx
+{
+    LUNAEX_LOAD_STATE = 1,
+    LUNAEX_SAVE_STATE = 2,
+	LUNAEX_TOGGLE_FPS = 3,
+};
 
 	// buffered
 #define MM_BUFF		0

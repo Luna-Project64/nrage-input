@@ -31,6 +31,7 @@
 #include "PakIO.h"
 #include "DirectInput.h"
 #include "International.h"
+#include "Luna.h"
 
 // ProtoTypes //
 bool prepareHeap();
@@ -319,6 +320,7 @@ EXPORT void CALL InitiateControllers (CONTROL_INFO ControlInfo)
 
 #endif // SPECS_VERSION
 {
+	Luna::gMainWindow = hMainWindow;
 	DebugWriteA("CALLED: InitiateControllers\n");
 	if( !prepareHeap())
 		return;
@@ -882,6 +884,11 @@ extern "C" EXPORT void CALL PluginLoaded(void)
 		if (!cfg)
 			*gPluginConfigDir = '\0';
 	}
+}
+
+extern "C" EXPORT void CALL LunaSetExCommandHandler(LunaExCommandFn fn)
+{
+	Luna::gExCommandHandler = fn;
 }
 
 // Prepare a global heap.  Use P_malloc and P_free as wrappers to grab/release memory.

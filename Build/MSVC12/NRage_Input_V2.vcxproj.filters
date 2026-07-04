@@ -50,6 +50,9 @@
     <ClCompile Include="..\..\goombasav\goombasav.c">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Luna.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\commonIncludes.h">
@@ -104,6 +107,9 @@
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\goombasav\minilzo-2.06\minilzo.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Luna.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>

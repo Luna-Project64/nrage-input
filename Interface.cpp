@@ -1315,11 +1315,69 @@ BOOL CALLBACK ConfigModifierDialog( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM 
 	}
 }
 
+static const char* sLunaModTypes[] = { "Load State", "Save State", "Toggle FPS" };
+
+static const char* lunaStrType(int type)
+{
+	if (type <= 0 || type > sizeof(sLunaModTypes) / sizeof(sLunaModTypes[0]))
+		return "Unknown";
+	return sLunaModTypes[type - 1];
+}
+
+BOOL CALLBACK LunaModifierDialog(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	DWORD dwValue;
+	HWND hDlgItem;
+	int iSel;
+	switch (uMsg)
+	{
+	case WM_INITDIALOG:
+		// DropDown
+		hDlgItem = GetDlgItem(hDlg, IDC_COMBO_LUNA);
+		int i;
+
+		i = SendMessage(hDlgItem, CB_ADDSTRING, 0, (LPARAM)sLunaModTypes[0]);
+		SendMessage(hDlgItem, CB_SETITEMDATA, i, LUNAEX_LOAD_STATE);
+
+		i = SendMessage(hDlgItem, CB_ADDSTRING, 0, (LPARAM)sLunaModTypes[1]);
+		SendMessage(hDlgItem, CB_SETITEMDATA, i, LUNAEX_SAVE_STATE);
+
+		i = SendMessage(hDlgItem, CB_ADDSTRING, 0, (LPARAM)sLunaModTypes[2]);
+		SendMessage(hDlgItem, CB_SETITEMDATA, i, LUNAEX_TOGGLE_FPS);
+		// DropDown End
+
+		return FALSE; // don't give it focus
+
+	case WM_USER_UPDATE:
+		if (wParam == MDT_LUNA)
+			dwValue = (DWORD)lParam;
+		else
+			dwValue = 0;
+
+		hDlgItem = GetDlgItem(hDlg, IDC_COMBO_LUNA);
+		SendMessage(hDlgItem, CB_SETCURSEL, dwValue <= 0 ? dwValue : (dwValue - 1), 0);
+
+		return TRUE;
+
+	case WM_USER_READVALUES:
+		dwValue = 0;
+
+		hDlgItem = GetDlgItem(hDlg, IDC_COMBO_LUNA);
+		iSel = SendMessage(hDlgItem, CB_GETCURSEL, 0, 0);
+		*(DWORD*)wParam = iSel < 0 ? 0 : iSel + 1;
+
+		return TRUE;
+
+	default:
+		return FALSE; //false means the msg didn't got processed
+	}
+}
+
 void ModDescription( HWND hListView, int iEntry, const LPMODIFIER pModifier )
 {
 	TCHAR szBuffer[DEFAULT_BUFFER];
-	const UINT iModTypes[] = { IDS_M_TAB_NONE, IDS_M_TAB_MOVE, IDS_M_TAB_MACRO, IDS_M_TAB_CONFIG };
-	TCHAR pszModTypes[4][16];
+	const UINT iModTypes[] = { IDS_M_TAB_NONE, IDS_M_TAB_MOVE, IDS_M_TAB_MACRO, IDS_M_TAB_CONFIG, IDS_M_TAB_LUNA };
+	TCHAR pszModTypes[5][16];
 
 	for (int i = 0; i < ARRAYSIZE(iModTypes); i++ )
 		LoadString( g_hResourceDLL, iModTypes[i], pszModTypes[i], ARRAYSIZE(pszModTypes[i]) );
@@ -1409,6 +1467,11 @@ void ModDescription( HWND hListView, int iEntry, const LPMODIFIER pModifier )
 		}
 		break;
 
+	case MDT_LUNA:
+		ListView_SetItemText(hListView, iEntry, 1, pszModTypes[4]);
+		wsprintf(szBuffer, _T("%s"), lunaStrType(pModifier->dwSpecific));
+		break;
+
 	case MDT_NONE:
 	default:
 		ListView_SetItemText( hListView, iEntry, 1, pszModTypes[0] );
@@ -1488,6 +1551,9 @@ BOOL CALLBACK ModifierTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 		i = SendMessage( hDlgItem, CB_ADDSTRING, 0, (LPARAM)pszModTypes[3] );
 		SendMessage( hDlgItem, CB_SETITEMDATA, i, MDT_CONFIG );
+
+		i = SendMessage(hDlgItem, CB_ADDSTRING, 0, (LPARAM)"Luna");
+		SendMessage(hDlgItem, CB_SETITEMDATA, i, MDT_LUNA);
 		// DropDown End
 
 		ZeroMemory(&storage, sizeof(BUTTON));
@@ -1796,6 +1862,9 @@ BOOL CALLBACK ModifierTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 				break;
 			case MDT_CONFIG:
 				hModProperties = CreateDialog( g_hResourceDLL, MAKEINTRESOURCE( IDD_MOD_CONFIG ), hDlg, ConfigModifierDialog );
+				break;
+			case MDT_LUNA:
+				hModProperties = CreateDialog( g_hResourceDLL, MAKEINTRESOURCE(IDD_MOD_LUNA), hDlg, LunaModifierDialog );
 				break;
 			case MDT_NONE:
 			default:
