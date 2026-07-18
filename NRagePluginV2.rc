@@ -7,7 +7,8 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "afxres.h"
+#include "afxres.h"
+
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
@@ -288,9 +289,8 @@ BEGIN
     CTEXT           "PLACEHOLDER",IDT_CRIGHT,219,43,137,10,SS_CENTERIMAGE | NOT WS_GROUP,WS_EX_STATICEDGE
     CTEXT           "PLACEHOLDER",IDT_CDOWN,219,54,137,10,SS_CENTERIMAGE | NOT WS_GROUP,WS_EX_STATICEDGE
     GROUPBOX        "Analog Stick",IDC_STATIC,188,70,175,97
-    CTEXT           "R PLACEHOLDER",IDT_RANGE,194,81,110,8
-    CONTROL         "PLACEHOLDER",IDC_CTRRANGE,"msctls_trackbar32",TBS_AUTOTICKS | WS_GROUP | WS_TABSTOP,194,89,113,11
-    CONTROL         "Real N64 Range",IDC_N64RANGE,"Button",BS_AUTOCHECKBOX | BS_MULTILINE | WS_GROUP | WS_TABSTOP,312,82,44,19
+    CTEXT           "R PLACEHOLDER",IDT_RANGE,198,81,71,8
+    CONTROL         "PLACEHOLDER",IDC_CTRRANGE,"msctls_trackbar32",TBS_AUTOTICKS | WS_GROUP | WS_TABSTOP,198,89,73,11
     CONTROL         "Config 1",IDC_CONFIG1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,194,103,42,10
     CONTROL         "Config 2",IDC_CONFIG2,"Button",BS_AUTORADIOBUTTON,254,103,42,10
     PUSHBUTTON      "Up",IDC_AUP,194,119,24,10,BS_NOTIFY | WS_GROUP
@@ -301,6 +301,8 @@ BEGIN
     CTEXT           "PLACEHOLDER",IDT_ALEFT,219,130,137,10,SS_CENTERIMAGE | NOT WS_GROUP,WS_EX_STATICEDGE
     CTEXT           "PLACEHOLDER",IDT_ARIGHT,219,141,137,10,SS_CENTERIMAGE | NOT WS_GROUP,WS_EX_STATICEDGE
     CTEXT           "PLACEHOLDER",IDT_ADOWN,219,152,137,10,SS_CENTERIMAGE | NOT WS_GROUP,WS_EX_STATICEDGE
+    CONTROL         "",IDC_CTRRANGE_DIAG,"msctls_trackbar32",TBS_AUTOTICKS | WS_GROUP | WS_TABSTOP,275,89,73,11
+    CTEXT           "R PLACEHOLDER",IDT_RANGE_DIAG,278,81,71,8
 END
 
 IDD_CONTROLLERPAK DIALOGEX 0, 0, 370, 180
@@ -564,7 +566,7 @@ BEGIN
             VALUE "FileDescription", "Zilmar Spec Plugin for N64 Emulators"
             VALUE "FileVersion", "2.3c"
             VALUE "InternalName", "NRage_Input_V2"
-            VALUE "LegalCopyright", "Copyright © 2001-2011 N-Rage, compiled under GPL licensing"
+            VALUE "LegalCopyright", "Copyright ï¿½ 2001-2011 N-Rage, compiled under GPL licensing"
             VALUE "OriginalFilename", "NRage_Input_V2.dll"
             VALUE "ProductName", "NRage_Input_V2"
             VALUE "ProductVersion", "2.3c"

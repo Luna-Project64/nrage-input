@@ -217,12 +217,15 @@
 #define IDC_CTRRANGE                    1041
 #define IDC_RAWMODE                     1042
 #define IDT_MSSENSITIVITY_X             1043
+#define IDC_CTRRANGE_DIAG               1043
 #define IDT_DEADZONE                    1044
 #define IDT_RUMBLESTRENGTH              1045
 #define IDT_MSSENSITIVITY_Y             1046
 #define IDT_MEMPAKSTATE                 1048
 #define IDT_RANGE                       1049
 #define IDC_CLEARCONTROLLER             1050
+#define IDT_RANGE2                      1050
+#define IDT_RANGE_DIAG                  1050
 #define IDC_MODIFIERLIST                1054
 #define IDC_PROPWINDOW                  1055
 #define IDC_KILLMODIFIER                1056
@@ -367,13 +370,12 @@
 #define IDC_XC_LTS                      1194
 #define IDC_XC_RTS                      1195
 #define IDS_D_THRESHOLD                 1196
-#define IDC_STATIC                      -1
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        149
+#define _APS_NEXT_RESOURCE_VALUE        150
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1196
 #define _APS_NEXT_SYMED_VALUE           101

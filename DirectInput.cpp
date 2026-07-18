@@ -495,38 +495,34 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 		}
 	}
 
-	if( pcController->fRealN64Range && ( lAxisValueX || lAxisValueY ))
+	if( pcController->bDiagStretch && ( lAxisValueX || lAxisValueY ))
 	{
-		long lAbsoluteX = ( lAxisValueX > 0 ) ? lAxisValueX : -lAxisValueX;
-		long lAbsoluteY = ( lAxisValueY > 0 ) ? lAxisValueY : -lAxisValueY;
+		float X = fabs(lAxisValueX / 32768.f);
+		float Y = fabs(lAxisValueY / 32768.f);
+		if (Y > X)
+			std::swap(X, Y);
 
-		long lRangeX;
-		long lRangeY;
+		auto slope = [](float d) { return (1 - d) / d; };
+        auto unslope = [](float s) { return 1 / (1 + s); };
 
-		if(	lAbsoluteX > lAbsoluteY )
-		{
-			lRangeX = MAXAXISVALUE;
-			lRangeY = lRangeX * lAbsoluteY / lAbsoluteX;
-		}
-		else
-		{
-			lRangeY = MAXAXISVALUE;
-			lRangeX = lRangeY * lAbsoluteX / lAbsoluteY;
-		}
+		float toSlope = slope(70.f / 85.f);
+		float fromSlope = slope(70.f / 85.f - pcController->bDiagStretch / 500.f);
 
-		// TODO: optimize this --rabid
-		double dRangeDiagonal = sqrt((double)(lRangeX * lRangeX + lRangeY * lRangeY));
-//		__asm{
-//			fld fRangeDiagonal
-//			fsqrt
-//			fstp fRangeDiagonal
-//			fwait
-//		}
-		double dRel = MAXAXISVALUE / dRangeDiagonal;
+		float fromAvg = X + fromSlope * Y;
+		float toAvg = X + toSlope * Y;
+
+		float fullMultiplier = fromAvg / toAvg;
+		float addition = fullMultiplier - 1;
+		float dampening = fromAvg;
+
+		float multiplier = 1.f + addition * dampening;
+		float maxMultiplier = 1.f / max(X, Y);
+		if (multiplier > maxMultiplier)
+			multiplier = maxMultiplier;
 
 		*pdwData = MAKELONG(w_Buttons,
-							MAKEWORD(	(BYTE)(min( max( MINAXISVALUE, (long)(lAxisValueX * d_ModifierX * dRel )), MAXAXISVALUE) / N64DIVIDER ),
-										(BYTE)(min( max( MINAXISVALUE, (long)(lAxisValueY * d_ModifierY * dRel )), MAXAXISVALUE) / N64DIVIDER )));
+							MAKEWORD(	(BYTE)(min( max( MINAXISVALUE, (long)(lAxisValueX * d_ModifierX * multiplier)), MAXAXISVALUE) / N64DIVIDER ),
+										(BYTE)(min( max( MINAXISVALUE, (long)(lAxisValueY * d_ModifierY * multiplier)), MAXAXISVALUE) / N64DIVIDER )));
 	}
 	else
 	{

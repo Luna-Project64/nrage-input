@@ -626,10 +626,6 @@ BOOL CALLBACK ControlsTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 		switch( LOWORD(wParam) )
 		{
-		case IDC_N64RANGE:
-			g_ivConfig->Controllers[g_ivConfig->ChosenTab].fRealN64Range = ( IsDlgButtonChecked( hDlg, LOWORD(wParam) ) == BST_CHECKED );
-			return TRUE;
-
 		case IDC_RAPIDFIREENABLE:
 			g_ivConfig->Controllers[g_ivConfig->ChosenTab].bRapidFireEnabled = (IsDlgButtonChecked( hDlg, LOWORD(wParam)) == BST_CHECKED);
 			return TRUE;
@@ -745,16 +741,22 @@ BOOL CALLBACK ControlsTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 	case WM_HSCROLL: // TrackBars
 	case WM_VSCROLL:
+		TCHAR tszText[DEFAULT_BUFFER];
 		switch ( GetWindowLong( (HWND)lParam, GWL_ID ) )
 		{
 		case IDC_CTRRANGE:
-			TCHAR tszText[DEFAULT_BUFFER];
-
 			LoadString( g_hResourceDLL, IDS_C_RANGE, tszText, DEFAULT_BUFFER );
 			g_ivConfig->Controllers[g_ivConfig->ChosenTab].bStickRange = (BYTE)SendMessage( (HWND)lParam, TBM_GETPOS, 0, 0 );
 			wsprintf( szBuffer, tszText, g_ivConfig->Controllers[g_ivConfig->ChosenTab].bStickRange );
 			SendMessage( GetDlgItem( hDlg, IDT_RANGE ), WM_SETTEXT , 0, (LPARAM)szBuffer );
 			return TRUE;
+
+		case IDC_CTRRANGE_DIAG:
+			g_ivConfig->Controllers[g_ivConfig->ChosenTab].bDiagStretch = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
+			wsprintf(szBuffer, "Diag Stretch: %d%%", g_ivConfig->Controllers[g_ivConfig->ChosenTab].bDiagStretch);
+			SendMessage(GetDlgItem(hDlg, IDT_RANGE_DIAG), WM_SETTEXT, 0, (LPARAM)szBuffer);
+			return TRUE;
+
 		case IDC_RAPIDFIRERATE:
 			g_ivConfig->Controllers[g_ivConfig->ChosenTab].bRapidFireRate = 33 - (BYTE)SendMessage( (HWND)lParam, TBM_GETPOS, 0, 0 );
 			return TRUE;
@@ -772,7 +774,6 @@ BOOL CALLBACK ControlsTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 		if( wParam == 0 )
 		{
-			CheckDlgButton( hDlg, IDC_N64RANGE, g_ivConfig->Controllers[g_ivConfig->ChosenTab].fRealN64Range ? BST_CHECKED : BST_UNCHECKED );
 			CheckDlgButton( hDlg, IDC_RAPIDFIREENABLE, g_ivConfig->Controllers[g_ivConfig->ChosenTab].bRapidFireEnabled ? BST_CHECKED : BST_UNCHECKED );
 			CheckDlgButton( hDlg, IDC_CONFIG1, ( g_ivConfig->Controllers[g_ivConfig->ChosenTab].bAxisSet == 0 ) ? BST_CHECKED : BST_UNCHECKED );
 			CheckDlgButton( hDlg, IDC_CONFIG2, ( g_ivConfig->Controllers[g_ivConfig->ChosenTab].bAxisSet == 1 ) ? BST_CHECKED : BST_UNCHECKED );
@@ -780,9 +781,15 @@ BOOL CALLBACK ControlsTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 
 			SendMessage( GetDlgItem( hDlg, IDC_CTRRANGE ), TBM_SETPOS, TRUE, g_ivConfig->Controllers[g_ivConfig->ChosenTab].bStickRange );
+			SendMessage( GetDlgItem( hDlg, IDC_CTRRANGE_DIAG ), TBM_SETPOS, TRUE, g_ivConfig->Controllers[g_ivConfig->ChosenTab].bDiagStretch);
+
 			LoadString( g_hResourceDLL, IDS_C_RANGE, szTemp, 40 );
 			wsprintf( szBuffer, szTemp, g_ivConfig->Controllers[g_ivConfig->ChosenTab].bStickRange );
 			SendMessage( GetDlgItem( hDlg, IDT_RANGE ), WM_SETTEXT , 0, (LPARAM)szBuffer );
+
+			wsprintf(szBuffer, "Diag Stretch: %d%%", g_ivConfig->Controllers[g_ivConfig->ChosenTab].bDiagStretch);
+			SendMessage(GetDlgItem(hDlg, IDT_RANGE_DIAG), WM_SETTEXT, 0, (LPARAM)szBuffer);
+
 			SendMessage( GetDlgItem( hDlg, IDC_RAPIDFIRERATE ), TBM_SETPOS, TRUE, 33 - g_ivConfig->Controllers[g_ivConfig->ChosenTab].bRapidFireRate );
 
 			i = 0;
@@ -3892,7 +3899,7 @@ void SetControllerDefaults( LPCONTROLLER pcController )
 	ZeroMemory( pcController, sizeof(CONTROLLER) );
 
 	pcController->fRawData =			1;
-	pcController->fRealN64Range =		0;
+	pcController->bDiagStretch =		0;
 	pcController->bRapidFireEnabled =	0;
 	pcController->bRapidFireRate =		3; // Set default rapid fire rate here
 	pcController->bStickRange =			DEFAULT_STICKRANGE;
