@@ -611,6 +611,11 @@ BOOL CALLBACK ControlsTabProc( HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		SendMessage( hDlgItem, TBM_SETTICFREQ, (WPARAM) 10, 0 );
 		SendMessage( hDlgItem, TBM_SETPAGESIZE, (WPARAM) 0, 1 );
 
+		hDlgItem = GetDlgItem(hDlg, IDC_CTRRANGE_DIAG);
+		SendMessage(hDlgItem, TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(-100, 100));
+		SendMessage(hDlgItem, TBM_SETTICFREQ, (WPARAM)20, 0);
+		SendMessage(hDlgItem, TBM_SETPAGESIZE, (WPARAM)0, 1);
+
 		// SetTicks on RapidFire Bar
 		hDlgItem = GetDlgItem( hDlg, IDC_RAPIDFIRERATE );
 		SendMessage( hDlgItem, TBM_SETRANGE, (WPARAM) TRUE, (LPARAM) MAKELONG( 0, 32 ));

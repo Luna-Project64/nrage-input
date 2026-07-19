@@ -144,7 +144,7 @@ typedef struct _CONTROLLER		// AN N64 CONTROLLER
 	unsigned fMouse;			// does it use a mouse?
 	unsigned fGamePad;			// does it use a gamepad/joystick?
 
-	unsigned bDiagStretch;		// does it have the "Real N64 Range" flag set?
+	int      bDiagStretch;		// does it have the "Real N64 Range" flag set?
 	unsigned bAxisSet;			// which set of axes are we using? (Control 1, Control 2)
 	unsigned bMouseMoveX;		// does it use buffered/absolute mouse for X?  MM_BUFF, MM_ABS, MM_DEAD
 	unsigned bMouseMoveY;		// does it use buffered/absolute mouse for Y?
