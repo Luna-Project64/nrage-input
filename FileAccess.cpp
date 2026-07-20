@@ -1519,7 +1519,7 @@ void DumpControllerSettings(FILE * fFile, int i, bool bIsINI)
 	fprintf(fFile, STRING_INI_XINPUT "=%u\n", g_ivConfig->Controllers[i].fXInput);
 	fprintf(fFile, STRING_INI_RAWDATA "=%u\n", g_ivConfig->Controllers[i].fRawData);
 	fprintf(fFile, STRING_INI_PAKTYPE "=%u\n", g_ivConfig->Controllers[i].PakType);
-	fprintf(fFile, STRING_INI_REALN64RANGE "=%u\n", g_ivConfig->Controllers[i].bDiagStretch);
+	fprintf(fFile, STRING_INI_REALN64RANGE "=%d\n", g_ivConfig->Controllers[i].bDiagStretch);
 	fprintf(fFile, STRING_INI_RAPIDFIREENABLED "=%u\n", g_ivConfig->Controllers[i].bRapidFireEnabled);
 	fprintf(fFile, STRING_INI_RAPIDFIRERATE "=%u\n", g_ivConfig->Controllers[i].bRapidFireRate);
 	fprintf(fFile, STRING_INI_STICKRANGE "=%u\n", g_ivConfig->Controllers[i].bStickRange);
