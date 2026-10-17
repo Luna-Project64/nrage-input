@@ -26,8 +26,6 @@
 
 #include <dinput.h>
 
-#include <set>
-
 extern LPDIRECTINPUT8 g_pDIHandle;
 
 
@@ -37,12 +35,42 @@ bool PrepareInputDevices();
 void InitMouse();
 void GetDeviceDatas();
 bool GetNControllerInput ( const int indexController, LPDWORD pdwData );
+void NeutralizeDeviceState( DEVICE &device );
 
-struct MakeDeviceCtx
-{
-	bool acquired = false;
-	std::set<DWORD> data;
-};
+	// Devices we lose and get back are held at neutral for this long (milliseconds) before we
+	// believe what they tell us. A controller that reconnects mid-attempt otherwise gets to
+	// report one frame of garbage, which shows up in-game as a phantom stick flick.
+#define DEVICE_SETTLE_MS		250
+	// How long to wait (milliseconds) before retrying Acquire() on a device that isn't there.
+	// Retrying every frame burns time inside the emulator's input path for no benefit.
+#define REACQUIRE_INTERVAL_MS	250
+	// Acquire() can answer DIERR_INPUTLOST; retry, but don't spin on it forever.
+#define ACQUIRE_MAX_RETRIES		8
+
+	// Hotplug: how long (milliseconds) to wait after the last device-change notification
+	// before rescanning. Connecting one controller produces a burst of HID arrivals, and one
+	// rescan per burst is enough.
+#define HOTPLUG_DEBOUNCE_MS		400
+
+	// How many state changes DirectInput queues per device. GetDeviceState only reports where
+	// a button is right now, so a press and release that both land between two reads is
+	// invisible -- which is what makes a deliberate one-frame tap occasionally do nothing.
+	// The queue lets us see it happened. Overflowing just drops the oldest events, and the
+	// immediate state is still authoritative, so this only has to be big enough for a frame's
+	// worth of traffic from a fast-polling pad.
+#define DEVICE_BUFFER_SIZE		64
+	// Ignore queued events older than this (milliseconds). While the emulator is paused or in
+	// a menu nothing drains the queue, and without this the first read afterwards would fire
+	// off every button that was touched in the meantime. Generous enough to survive a badly
+	// lagging romhack stretching the gap between reads over several real frames.
+#define LATCH_MAX_AGE_MS		100
+
+extern bool g_bSubFrameTaps;
+void UpdateDeviceUsage();
+
+void StartDeviceWatcher();
+void StopDeviceWatcher();
+void RescanInputDevices();
 
 BOOL CALLBACK EnumMakeDeviceList( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef );
 

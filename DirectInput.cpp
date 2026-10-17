@@ -29,13 +29,19 @@
 #include "DirectInput.h"
 #include "XInputController.h"
 #include "Luna.h"
+#include "FileAccess.h"
 #include <math.h>
+#include <dbt.h>
 
 // ProtoTypes //
 HRESULT AcquireDevice( LPDIRECTINPUTDEVICE8 lpDirectInputDevice );
+BOOL CALLBACK EnumSetObjectsAxis( LPCDIDEVICEOBJECTINSTANCE lpddoi, LPVOID pvRef );
+static void SetDeviceBufferSize( LPDIRECTINPUTDEVICE8 lpDirectInputDevice );
+static void PollDeviceHotplug();
 
 // global Variables //
 LPDIRECTINPUT8  g_pDIHandle = NULL;													// Base DirectInput8-Handle
+bool g_bSubFrameTaps = true;														// see LatchSubFrameTaps(); "SubFrameTaps" in the INI turns it off
 
 //LPDIRECTINPUTDEVICE8 g_apInputDevice[6] = { NULL, NULL, NULL, NULL, NULL, NULL };	// array of Handles for devices
 																					// 0:Keyboard, 1:Mouse, the rest are FF gamepads
@@ -44,54 +50,205 @@ LPDIRECTINPUT8  g_pDIHandle = NULL;													// Base DirectInput8-Handle
 // DIMOUSESTATE2 g_msMouseState = { 0, 0, 0 };											// Store our mouse state data between reads (because every time we read data, it resets the device data)
 		// moved to g_sysMouse.stateAs...
 
+// Is this a keyboard or a mouse rather than a gamepad/joystick?
+// dwDevType is a packed DWORD (type in the low byte, subtype above it, plus DIDEVTYPE_HID),
+// so it has to be masked before it's compared to anything -- comparing the whole DWORD is
+// always unequal for real hardware.
+inline bool IsGamePadDevType( DWORD dwDevType )
+{
+	BYTE bType = LOBYTE( dwDevType );
+	return ( bType != DI8DEVTYPE_KEYBOARD ) && ( bType != DI8DEVTYPE_MOUSE );
+}
+
+// Force a device's cached state to "nothing is pressed".
+// A zeroed DIJOYSTATE is NOT neutral: rgdwPOV of 0 means the hat is being held straight up,
+// so POVs have to be set to -1 by hand or an absent gamepad reads as holding D-pad up.
+void NeutralizeDeviceState( DEVICE &device )
+{
+	ZeroMemory( &device.stateAs, sizeof(DEVICE::INPUTSTATE) );
+	ZeroMemory( device.abLatchedPress, sizeof(device.abLatchedPress) );
+
+	if( IsGamePadDevType( device.dwDevType ))
+		FillMemory( device.stateAs.joyState.rgdwPOV, sizeof(device.stateAs.joyState.rgdwPOV), 0xFF );
+}
+
+// Map a queued event's data offset onto the index BUTTON::bOffset uses for this device type.
+// -1 for anything that isn't a button or key: axes and POVs report a position rather than an
+// event, and we already have the current one.
+static int LatchIndexFromOffset( const DEVICE &device, DWORD dwOfs )
+{
+	switch( LOBYTE( device.dwDevType ))
+	{
+	case DI8DEVTYPE_KEYBOARD:
+		// c_dfDIKeyboard data offsets are the DIK scancodes themselves
+		return ( dwOfs < 256 ) ? (int)dwOfs : -1;
+
+	case DI8DEVTYPE_MOUSE:
+		return -1;		// nothing bound to a mouse needs sub-frame precision
+
+	default:
+		if( dwOfs >= DIJOFS_BUTTON( 0 ) && dwOfs < DIJOFS_BUTTON( 0 ) + ARRAYSIZE( device.stateAs.joyState.rgbButtons ))
+			return (int)( dwOfs - DIJOFS_BUTTON( 0 ));
+		return -1;
+	}
+}
+
+// Drain the device's event queue and remember any button that went down since the last read,
+// so a press too short to be caught by the immediate state still reaches the game -- for
+// exactly one frame, because the latch is rebuilt from scratch on every read.
+static void LatchSubFrameTaps( DEVICE &device )
+{
+	ZeroMemory( device.abLatchedPress, sizeof(device.abLatchedPress) );
+
+	if( !g_bSubFrameTaps )
+		return;
+
+	DIDEVICEOBJECTDATA rgod[DEVICE_BUFFER_SIZE];
+	DWORD dwItems = ARRAYSIZE( rgod );
+
+	// DI_BUFFEROVERFLOW is a success code and only means we lost the oldest events; the
+	// immediate state we already read is still correct, so take what's here and carry on.
+	if( FAILED( device.didHandle->GetDeviceData( sizeof(DIDEVICEOBJECTDATA), rgod, &dwItems, 0 )))
+		return;
+
+	DWORD dwNow = GetTickCount();
+
+	for( DWORD n = 0; n < dwItems; ++n )
+	{
+		if( !( rgod[n].dwData & 0x80 ))
+			continue;		// a release, not a press
+
+		if( (LONG)( dwNow - rgod[n].dwTimeStamp ) > LATCH_MAX_AGE_MS )
+			continue;		// stale: queued while nothing was reading this device
+
+		int iLatch = LatchIndexFromOffset( device, rgod[n].dwOfs );
+
+		if( iLatch >= 0 )
+			device.abLatchedPress[iLatch] = 1;
+	}
+}
+
+// Try to get a lost device back.
+// A controller that has just come back over USB or Bluetooth is, as far as the HID stack is
+// concerned, a new device, and the first state DirectInput hands us afterwards can be a
+// leftover or an axis reported in the device's own default range instead of the -32768..32767
+// we asked for. Either one reads as a stick shoved into a corner for a frame or two, which is
+// exactly long enough to end a run. So: re-apply the axis ranges, then hold the device at
+// neutral until it has had a moment to settle.
+static bool ReacquireDevice( DEVICE &device )
+{
+	DWORD dwNow = GetTickCount();
+
+	// A device that isn't there yet fails to acquire every single frame, from inside the
+	// emulator's input path. Back off instead of retrying 60 times a second.
+	if( device.fAcquireThrottled && (LONG)( dwNow - device.dwNextAcquire ) < 0 )
+		return false;
+
+	if( FAILED( AcquireDevice( device.didHandle )))
+	{
+		device.dwNextAcquire = dwNow + REACQUIRE_INTERVAL_MS;
+		device.fAcquireThrottled = true;
+		return false;
+	}
+
+	device.fAcquireThrottled = false;
+
+	if( IsGamePadDevType( device.dwDevType ))
+	{
+		// SetProperty needs the device unacquired, so give up the acquisition we just took.
+		device.didHandle->Unacquire();
+		device.didHandle->EnumObjects( EnumSetObjectsAxis, device.didHandle, DIDFT_AXIS );
+		SetDeviceBufferSize( device.didHandle );
+
+		if( FAILED( AcquireDevice( device.didHandle )))
+		{
+			device.dwNextAcquire = dwNow + REACQUIRE_INTERVAL_MS;
+			device.fAcquireThrottled = true;
+			return false;
+		}
+
+		device.dwSettleTime = dwNow + DEVICE_SETTLE_MS;
+		device.fSettling = true;
+	}
+
+	DebugWrite( _T("Acquired device %s\n"), device.szProductName );
+	return true;
+}
+
+// Poll one device and refresh its cached state.
+// Every failure path ends at neutral rather than at "whatever it said last time", so a
+// controller that dies while a direction is held doesn't leave that direction stuck on.
+static void ReadDeviceState( DEVICE &device )
+{
+	if( !device.didHandle )
+	{
+		device.fAcquired = false;
+		NeutralizeDeviceState( device );
+		return;
+	}
+
+	if( !device.fInUse )		// nothing reads this device; don't spend a frame's time on it
+		return;
+
+	HRESULT hr = device.didHandle->Poll();
+
+	if( FAILED( hr ))
+	{
+		device.fAcquired = false;
+		if( !ReacquireDevice( device ))
+		{
+			NeutralizeDeviceState( device );
+			return;
+		}
+	}
+
+	switch( LOBYTE( device.dwDevType ))
+	{
+	case DI8DEVTYPE_KEYBOARD:
+		hr = device.didHandle->GetDeviceState( sizeof(device.stateAs.rgbButtons), device.stateAs.rgbButtons );
+		break;
+	case DI8DEVTYPE_MOUSE:
+		hr = device.didHandle->GetDeviceState( sizeof(device.stateAs.mouseState), &device.stateAs.mouseState );
+		break;
+	default:
+		hr = device.didHandle->GetDeviceState( sizeof(device.stateAs.joyState), &device.stateAs.joyState );
+	}
+
+	// DIERR_INPUTLOST and DIERR_UNPLUGGED land here too, not just DIERR_NOTACQUIRED; the old
+	// code only zeroed on the last of those and kept serving stale input for the others.
+	if( FAILED( hr ))
+	{
+		device.fAcquired = false;
+		NeutralizeDeviceState( device );
+		return;
+	}
+
+	device.fAcquired = true;
+
+	LatchSubFrameTaps( device );
+
+	if( device.fSettling )
+	{
+		if( (LONG)( GetTickCount() - device.dwSettleTime ) < 0 )
+			NeutralizeDeviceState( device );		// also drops the latches
+		else
+			device.fSettling = false;
+	}
+}
+
 // Update device data tables (so we only have to poll and read the devices once).  This is called by GetKeys and ReadController.
 void GetDeviceDatas()
 {
-	HRESULT hr;
+	// Pick up controllers plugged in after the ROM was loaded. Costs nothing unless the
+	// hotplug watcher actually saw a device come or go.
+	PollDeviceHotplug();
 
 	if( g_sysMouse.didHandle )
-	{
-		hr = g_sysMouse.didHandle->Poll();
-
-		if( FAILED( hr ))
-			AcquireDevice( g_sysMouse.didHandle ); // we'll try again next time
-
-		hr = g_sysMouse.didHandle->GetDeviceState( sizeof(DIMOUSESTATE2), &g_sysMouse.stateAs.mouseState );
-
-		if( FAILED( hr ))
-			ZeroMemory( &g_sysMouse.stateAs.mouseState, sizeof(DIMOUSESTATE2) );
-	}
+		ReadDeviceState( g_sysMouse );
 
 	// need to just poll every damn device we're using
 	for( int i = 0; i < g_nDevices; i++ )
-	{
-		if( g_devList[i].didHandle )
-		{
-			if( FAILED( g_devList[i].didHandle->Poll() ))
-				AcquireDevice( g_devList[i].didHandle ); // we'll try again next time
-		
-			switch (LOBYTE(g_devList[i].dwDevType))
-			{
-			case DI8DEVTYPE_KEYBOARD:
-				hr = g_devList[i].didHandle->GetDeviceState( sizeof(g_devList[i].stateAs.rgbButtons), g_devList[i].stateAs.rgbButtons );
-				break;
-			case DI8DEVTYPE_MOUSE:
-				hr = g_devList[i].didHandle->GetDeviceState( sizeof(g_devList[i].stateAs.mouseState), &g_devList[i].stateAs.mouseState );
-				break;
-			default:
-				hr = g_devList[i].didHandle->GetDeviceState( sizeof(g_devList[i].stateAs.joyState), &g_devList[i].stateAs.joyState );
-			}
-		}
-		else
-			hr = DIERR_NOTACQUIRED;
-
-		if( hr == DIERR_NOTACQUIRED ) // changed this because in the rare condition that we lose input between polling and GetDeviceState we don't want to reset our current controls --rabid
-		{
-			ZeroMemory( &g_devList[i].stateAs.joyState, sizeof(DEVICE::INPUTSTATE));
-			if (g_devList[i].dwDevType != DI8DEVTYPE_KEYBOARD && g_devList[i].dwDevType != DI8DEVTYPE_MOUSE)
-				FillMemory( g_devList[i].stateAs.joyState.rgdwPOV, sizeof(g_devList[i].stateAs.joyState.rgdwPOV), 0xFF ); // g_devList[i].stateAs.joyState.rgdwPOV = -1; // -1 is neutral
-		}	
-	}
+		ReadDeviceState( g_devList[i] );
 }
 
 // hacked up piece of shit, but it works
@@ -352,13 +509,18 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 		bool fNegInput = (( i == 1 ) || ( i == 2 )); // Input has to be negated
 
 		BUTTON btnButton = pcController->aButton[PF_APADR + pcController->bAxisSet * 4 + i];
+
+		if( !btnButton.parentDevice )	// assigned to a device that isn't connected
+			continue;
+
 		LPLONG plRawState = (LPLONG)&btnButton.parentDevice->stateAs.joyState;
 		
 		switch( btnButton.bBtnType )
 		{
 		case DT_JOYBUTTON:
 			l_Value = MAXAXISVALUE;
-			b_Value = ( btnButton.parentDevice->stateAs.joyState.rgbButtons[btnButton.bOffset] & 0x80 ) != 0;
+			b_Value = ( btnButton.parentDevice->stateAs.joyState.rgbButtons[btnButton.bOffset] & 0x80 ) != 0
+					|| btnButton.parentDevice->abLatchedPress[btnButton.bOffset] != 0;
 			break;
 
 		case DT_JOYSLIDER:
@@ -388,7 +550,8 @@ bool GetNControllerInput ( const int indexController, LPDWORD pdwData )
 
 		case DT_KEYBUTTON:
 			// deleted a bunch of stuff hereish, won't even pretend to understand how it worked ~N3
-			if( btnButton.parentDevice->stateAs.rgbButtons[btnButton.bOffset] & 0x80 )
+			if(( btnButton.parentDevice->stateAs.rgbButtons[btnButton.bOffset] & 0x80 )
+				|| btnButton.parentDevice->abLatchedPress[btnButton.bOffset] )
 			{
 				b_Value = true;
 
@@ -606,7 +769,7 @@ void FreeDirectInput ()
 	ZeroMemory( g_apdiEffect, sizeof(g_apdiEffect) );
 
 	// release FF devices
-	for( i = 0; i << ARRAYSIZE(g_apFFDevice); ++i )
+	for( i = 0; i < ARRAYSIZE(g_apFFDevice); ++i )		// was "i << ARRAYSIZE(...)", which is 0 on the first pass, so this loop never ran and the FF devices leaked
 		ReleaseDevice( g_apFFDevice[i] );
 	ZeroMemory( g_apFFDevice, sizeof(g_apFFDevice) );
 
@@ -640,7 +803,8 @@ void FreeDirectInput ()
 inline HRESULT AcquireDevice( LPDIRECTINPUTDEVICE8 lpDirectInputDevice )
 {
 	HRESULT hResult = lpDirectInputDevice->Acquire();
-	while( hResult == DIERR_INPUTLOST )
+	// bounded: a device that answers DIERR_INPUTLOST forever used to hang the emulation thread here
+	for( int iRetry = 0; hResult == DIERR_INPUTLOST && iRetry < ACQUIRE_MAX_RETRIES; ++iRetry )
 		hResult = lpDirectInputDevice->Acquire();
 	if( SUCCEEDED( hResult ))
 		lpDirectInputDevice->Poll();
@@ -664,13 +828,6 @@ BOOL CALLBACK EnumGetEffectTypes( LPCDIEFFECTINFO pdei, LPVOID pvRef )
 // EnumMakeDeviceList has been rewritten. --rabid
 BOOL CALLBACK EnumMakeDeviceList( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef )
 {
-	MakeDeviceCtx* pctx = (MakeDeviceCtx*) pvRef;
-	if (pctx->acquired)
-		pctx->data = GetXInputDevices();
-
-	if( IsXInputDevice( pctx->data, &lpddi->guidProduct ) )		// Check if is XInput device --tecnicors
-        return DIENUM_CONTINUE;
-
 	if (IsEqualGUID(g_sysMouse.guidInstance, lpddi->guidInstance))
 		return DIENUM_CONTINUE;
 
@@ -729,6 +886,22 @@ BOOL CALLBACK EnumIsDeviceAvailable( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef )
 	return DIENUM_CONTINUE;
 }
 
+// Ask DirectInput to queue state changes as well as tracking the current state, so
+// LatchSubFrameTaps() can see presses that begin and end between two reads.
+// The device must be unacquired for this to take.
+static void SetDeviceBufferSize( LPDIRECTINPUTDEVICE8 lpDirectInputDevice )
+{
+	DIPROPDWORD dipdw;
+
+	dipdw.diph.dwSize		= sizeof(DIPROPDWORD);
+	dipdw.diph.dwHeaderSize	= sizeof(DIPROPHEADER);
+	dipdw.diph.dwObj		= 0;
+	dipdw.diph.dwHow		= DIPH_DEVICE;
+	dipdw.dwData			= DEVICE_BUFFER_SIZE;
+
+	lpDirectInputDevice->SetProperty( DIPROP_BUFFERSIZE, &dipdw.diph );
+}
+
 // Called by an axis enumerator in GetInputDevice.  Set the min and max range so we can pass the rec'd value right to the emulator.
 BOOL CALLBACK EnumSetObjectsAxis( LPCDIDEVICEOBJECTINSTANCE lpddoi, LPVOID pvRef)
 {
@@ -771,6 +944,7 @@ bool GetInputDevice(HWND hWnd, LPDIRECTINPUTDEVICE8& lpDirectInputDevice, GUID g
 			DebugWriteA("GetInputDevice: already created, attempting to reinit\n");
 			lpDirectInputDevice->Unacquire();
 			lpDirectInputDevice->SetCooperativeLevel( hWnd, dwCooperativeLevel );
+			SetDeviceBufferSize( lpDirectInputDevice );
 			return true;
 		}
 		else
@@ -834,9 +1008,12 @@ bool GetInputDevice(HWND hWnd, LPDIRECTINPUTDEVICE8& lpDirectInputDevice, GUID g
 	else
 		DebugWriteA("GetInputDevice: CreateDevice failed\n");
 
-	if (Success && (ppDiDataFormat == &c_dfDIJoystick))
+	if (Success)
 	{
-		lpDirectInputDevice->EnumObjects(EnumSetObjectsAxis, lpDirectInputDevice, DIDFT_AXIS);
+		if (ppDiDataFormat == &c_dfDIJoystick)
+			lpDirectInputDevice->EnumObjects(EnumSetObjectsAxis, lpDirectInputDevice, DIDFT_AXIS);
+
+		SetDeviceBufferSize( lpDirectInputDevice );
 	}
 
 	return Success;
@@ -1022,6 +1199,49 @@ DWORD CountControllerStructDevs( CONTROLLER *pController )
 }
 
 
+// Work out which devices anything actually reads, so GetDeviceDatas() can skip the rest.
+// A typical setup has a handful of HID devices connected and bindings on one of them; polling
+// the others every frame is work the emulation thread doesn't need to be doing.
+void UpdateDeviceUsage()
+{
+	int i, j;
+
+	for( i = 0; i < g_nDevices; ++i )
+		g_devList[i].fInUse = false;
+	g_sysMouse.fInUse = false;
+
+	for( i = 0; i < ARRAYSIZE( g_pcControllers ); ++i )
+	{
+		if( !g_pcControllers[i].fPlugged )
+			continue;		// GetKeys doesn't read an unplugged controller's assignments
+
+		for( j = 0; j < ARRAYSIZE( g_pcControllers[i].aButton ); ++j )
+			if( g_pcControllers[i].aButton[j].parentDevice )
+				g_pcControllers[i].aButton[j].parentDevice->fInUse = true;
+
+		for( j = 0; j < g_pcControllers[i].nModifiers; ++j )
+			if( g_pcControllers[i].pModifiers[j].btnButton.parentDevice )
+				g_pcControllers[i].pModifiers[j].btnButton.parentDevice->fInUse = true;
+	}
+
+	// Shortcuts are checked every frame no matter which controller they belong to
+	for( i = 0; i < ARRAYSIZE( g_scShortcuts.Player ); ++i )
+		for( j = 0; j < SC_TOTAL; ++j )
+			if( g_scShortcuts.Player[i].aButtons[j].parentDevice )
+				g_scShortcuts.Player[i].aButtons[j].parentDevice->fInUse = true;
+
+	if( g_scShortcuts.bMouseLock.parentDevice )
+		g_scShortcuts.bMouseLock.parentDevice->fInUse = true;
+
+	// A device we're about to stop reading must not keep reporting whatever it last said
+	for( i = 0; i < g_nDevices; ++i )
+		if( !g_devList[i].fInUse )
+			NeutralizeDeviceState( g_devList[i] );
+
+	if( !g_sysMouse.fInUse )
+		NeutralizeDeviceState( g_sysMouse );
+}
+
 // PrepareInputDevices rewritten --rabid
 bool PrepareInputDevices()
 {
@@ -1031,14 +1251,16 @@ bool PrepareInputDevices()
 
 	for( int i = 0; i < ARRAYSIZE( g_pcControllers ); ++i )
 	{
-		fGamePad = false;
 		if( g_pcControllers[i].fPlugged )
 		{
 			CountControllerStructDevs( &g_pcControllers[i] );
 
-			fKeyboard = g_pcControllers[i].fKeyboard != 0;
-			fMouse = g_pcControllers[i].fMouse != 0;
-			fGamePad = ( g_pcControllers[i].fGamePad != 0); // we'll assume for now that there's a gamepad to go with those buttons
+			// OR across every plugged controller, not just whichever one happened to be last:
+			// these used to be plain assignments, so a later controller with no mouse binding
+			// would clear the flag for an earlier one that had them, and turn off mouse lock.
+			fKeyboard |= g_pcControllers[i].fKeyboard != 0;
+			fMouse |= g_pcControllers[i].fMouse != 0;
+			fGamePad |= ( g_pcControllers[i].fGamePad != 0); // we'll assume for now that there's a gamepad to go with those buttons
 		}
 
 		ReleaseEffect( g_apdiEffect[i] );
@@ -1069,7 +1291,7 @@ bool PrepareInputDevices()
 		}
 		else
 		{
-			g_apFFDevice[i] = NULL;
+			ReleaseDevice( g_apFFDevice[i] );	// used to just NULL the pointer, leaking the device
 			DebugWriteA("Didn't get FF device %d\n", i);
 		}
 	}
@@ -1089,7 +1311,178 @@ bool PrepareInputDevices()
 		g_bExclusiveMouse = false;
 	}
 
+	UpdateDeviceUsage();
+
 	return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+// Device hotplug
+//
+// DirectInput only ever shows us the devices that existed when we enumerated, and the plugin
+// enumerated exactly once -- when the emulator first initialised it, which happens when a ROM
+// is loaded. Anything plugged in after that stayed invisible until the emulator was restarted.
+//
+// A message-only window on its own thread listens for HID arrivals and departures and does
+// nothing but raise a flag. The rescan itself runs on the emulation thread out of
+// GetDeviceDatas(), which already holds g_critical, so no other code has to learn about
+// locking and no DirectInput object is touched from two threads at once.
+
+	// {4D1E55B2-F16F-11CF-88CB-001111000030} == GUID_DEVINTERFACE_HID.
+	// Spelled out so we don't link hid.lib for a single constant.
+static const GUID guidDevInterfaceHID =
+	{ 0x4D1E55B2, 0xF16F, 0x11CF, { 0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 }};
+
+static const TCHAR szDeviceWatcherClass[] = _T("NRageDeviceWatcher");
+
+static HANDLE g_hWatcherThread = NULL;
+static DWORD g_dwWatcherThreadID = 0;
+static volatile LONG g_lHotplugPending = 0;		// raised by the watcher thread, cleared by the emulation thread
+static volatile LONG g_lHotplugDeadline = 0;	// tick count to rescan at; LONG so it writes atomically
+
+static LRESULT CALLBACK DeviceWatcherWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
+{
+	if( uMsg == WM_DEVICECHANGE && ( wParam == DBT_DEVICEARRIVAL || wParam == DBT_DEVICEREMOVECOMPLETE ))
+	{
+		InterlockedExchange( &g_lHotplugDeadline, (LONG)( GetTickCount() + HOTPLUG_DEBOUNCE_MS ));
+		InterlockedExchange( &g_lHotplugPending, 1 );
+		return TRUE;
+	}
+
+	return DefWindowProc( hWnd, uMsg, wParam, lParam );
+}
+
+static DWORD WINAPI DeviceWatcherThread( LPVOID )
+{
+	WNDCLASS wc;
+	ZeroMemory( &wc, sizeof(wc) );
+	wc.lpfnWndProc = DeviceWatcherWndProc;
+	wc.hInstance = g_strEmuInfo.hinst;
+	wc.lpszClassName = szDeviceWatcherClass;
+	RegisterClass( &wc );	// harmless if it's still registered from a previous run
+
+	// HWND_MESSAGE: no UI, no taskbar entry, and it never appears in the emulator's window list
+	HWND hWnd = CreateWindowEx( 0, szDeviceWatcherClass, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, wc.hInstance, NULL );
+
+	if( !hWnd )
+	{
+		DebugWriteA( "DeviceWatcher: CreateWindowEx failed (%lu)\n", GetLastError() );
+		UnregisterClass( szDeviceWatcherClass, wc.hInstance );
+		return 0;
+	}
+
+	DEV_BROADCAST_DEVICEINTERFACE filter;
+	ZeroMemory( &filter, sizeof(filter) );
+	filter.dbcc_size = sizeof(filter);
+	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+	filter.dbcc_classguid = guidDevInterfaceHID;
+
+	HDEVNOTIFY hNotify = RegisterDeviceNotification( hWnd, &filter, DEVICE_NOTIFY_WINDOW_HANDLE );
+
+	if( !hNotify )
+	{	// braces matter: in release builds DebugWriteA expands to more than one statement
+		DebugWriteA( "DeviceWatcher: RegisterDeviceNotification failed (%lu)\n", GetLastError() );
+	}
+
+	MSG msg;
+	while( GetMessage( &msg, NULL, 0, 0 ) > 0 )
+	{
+		TranslateMessage( &msg );
+		DispatchMessage( &msg );
+	}
+
+	if( hNotify )
+		UnregisterDeviceNotification( hNotify );
+	DestroyWindow( hWnd );
+	UnregisterClass( szDeviceWatcherClass, wc.hInstance );
+	return 0;
+}
+
+// Begin watching for controllers being plugged in and unplugged. Safe to call repeatedly.
+void StartDeviceWatcher()
+{
+	if( g_hWatcherThread )
+		return;
+
+	g_hWatcherThread = CreateThread( NULL, 0, DeviceWatcherThread, NULL, 0, &g_dwWatcherThreadID );
+
+	if( !g_hWatcherThread )
+	{	// braces matter: in release builds DebugWriteA expands to more than one statement
+		DebugWriteA( "DeviceWatcher: CreateThread failed (%lu)\n", GetLastError() );
+	}
+	else
+	{
+		DebugWriteA( "DeviceWatcher: started\n" );
+	}
+}
+
+void StopDeviceWatcher()
+{
+	if( !g_hWatcherThread )
+		return;
+
+	// PostThreadMessage can't be delivered until the thread owns a message queue, which it
+	// only gets once it has touched user32, so give it a few tries before giving up.
+	for( int i = 0; i < 200; ++i )
+	{
+		if( WaitForSingleObject( g_hWatcherThread, 0 ) != WAIT_TIMEOUT )
+			break;		// already gone
+		if( PostThreadMessage( g_dwWatcherThreadID, WM_QUIT, 0, 0 ))
+			break;
+		Sleep( 5 );
+	}
+
+	if( WaitForSingleObject( g_hWatcherThread, 2000 ) != WAIT_OBJECT_0 )
+	{
+		DebugWriteA( "DeviceWatcher: thread didn't shut down in time\n" );
+	}
+
+	CloseHandle( g_hWatcherThread );
+	g_hWatcherThread = NULL;
+	g_dwWatcherThreadID = 0;
+	InterlockedExchange( &g_lHotplugPending, 0 );
+}
+
+// Re-enumerate DirectInput and pick up whatever has appeared since we last looked.
+//
+// Entries already in g_devList are never moved or removed: BUTTON::parentDevice points
+// straight into that array, so the list may only ever be appended to. A device that gets
+// unplugged keeps its slot with a dead handle, which is exactly what lets it come back later
+// without the user having to rebind anything.
+void RescanInputDevices()
+{
+	if( !g_pDIHandle )
+		return;
+
+	const int nBefore = g_nDevices;
+
+	g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, NULL, DIEDFL_ATTACHEDONLY );
+
+	if( g_nDevices == nBefore )
+		return;		// nothing new; the arrival was something we already know about, or not an input device
+
+	DebugWriteA( "Hotplug: picked up %d new device(s), %d total\n", g_nDevices - nBefore, g_nDevices );
+
+	// Assignments that couldn't be bound at startup because their device wasn't connected get
+	// another chance now. Only reinitialise force feedback if something actually got bound.
+	if( ResolvePendingBindings() )
+		PrepareInputDevices();		// ends with UpdateDeviceUsage()
+	else
+		UpdateDeviceUsage();		// still needed: the new device starts out unread
+}
+
+// Called once per frame from GetDeviceDatas(), on the emulation thread, with g_critical held.
+static void PollDeviceHotplug()
+{
+	if( !g_lHotplugPending )
+		return;
+
+	// Connecting one controller fires a burst of HID notifications; one rescan per burst.
+	if( (LONG)( GetTickCount() - (DWORD)g_lHotplugDeadline ) < 0 )
+		return;
+
+	InterlockedExchange( &g_lHotplugPending, 0 );
+	RescanInputDevices();
 }
 
 bool IsAdaptoidCommandSupported( LPDIRECTINPUTDEVICE8 lpDirectInputDevice, DWORD cmd )
@@ -1248,6 +1641,11 @@ void InitMouse()
 // treat btnButton as a b_Value, and return whether it is pressed or not
 bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton)
 {
+	// The assignment names a device that isn't connected (yet). ResolvePendingBindings() will
+	// hook it up if the device turns up later; until then it simply reads as not pressed.
+	if( !btnButton.parentDevice )
+		return false;
+
 	long l_Value;
 	LPLONG plRawState = (LPLONG)&btnButton.parentDevice->stateAs.joyState;
 
@@ -1262,7 +1660,8 @@ bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton)
 	switch ( btnButton.bBtnType )
 	{
 	case DT_JOYBUTTON:
-		return ( btnButton.parentDevice->stateAs.joyState.rgbButtons[btnButton.bOffset] & 0x80 ) != 0;
+		return ( btnButton.parentDevice->stateAs.joyState.rgbButtons[btnButton.bOffset] & 0x80 ) != 0
+			|| btnButton.parentDevice->abLatchedPress[btnButton.bOffset] != 0;
 
 	case DT_JOYSLIDER:
 	case DT_JOYAXE:
@@ -1277,7 +1676,8 @@ bool IsBtnPressed(LPCONTROLLER pcController, BUTTON btnButton)
 		return GetJoyPadPOV( (PDWORD)&plRawState[btnButton.bOffset] , btnButton.bAxisID );
 
 	case DT_KEYBUTTON:
-		return ( btnButton.parentDevice->stateAs.rgbButtons[btnButton.bOffset] & 0x80 ) != 0;
+		return ( btnButton.parentDevice->stateAs.rgbButtons[btnButton.bOffset] & 0x80 ) != 0
+			|| btnButton.parentDevice->abLatchedPress[btnButton.bOffset] != 0;
 
 	case DT_MOUSEBUTTON:
 		return ( btnButton.parentDevice->stateAs.mouseState.rgbButtons[btnButton.bOffset] & 0x80 ) != 0;

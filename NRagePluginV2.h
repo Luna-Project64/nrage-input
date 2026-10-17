@@ -88,6 +88,21 @@ typedef struct _DEVICE
 		DIMOUSESTATE2 mouseState;
 		BYTE rgbButtons[256];		// keyboard state
 	} stateAs;
+
+	// Connection tracking, used by ReadDeviceState() in DirectInput.cpp so that a device
+	// dying or coming back mid-game doesn't leak a bogus input into the emulator.
+	bool fAcquired;					// did our last read of this device actually work?
+	bool fSettling;					// is dwSettleTime live? (a device we just got back isn't trusted yet)
+	bool fAcquireThrottled;			// is dwNextAcquire live?
+	DWORD dwSettleTime;				// tick count at which this device's data becomes trustworthy again
+	DWORD dwNextAcquire;			// tick count before which we don't bother retrying Acquire()
+
+	bool fInUse;					// does any assignment actually read this device? see UpdateDeviceUsage()
+
+	// Buttons/keys that went down and back up between two polls, so a press shorter than a
+	// frame still reaches the game. Indexed the same way BUTTON::bOffset is for this device
+	// type: joystick button number, or DIK scancode for a keyboard. See ReadDeviceState().
+	BYTE abLatchedPress[256];
 } DEVICE, *LPDEVICE;
 
 typedef struct _BUTTON
@@ -392,6 +407,31 @@ extern bool g_bConfiguring;
 extern bool g_bExclusiveMouse;
 
 extern int g_iFirstController;
+
+// Where an unresolved BUTTON assignment lives, so ResolvePendingBindings() can fill it in later.
+#define PB_BUTTON		0		// g_pcControllers[bController].aButton[iIndex]
+#define PB_MODIFIER		1		// g_pcControllers[bController].pModifiers[iIndex].btnButton
+#define PB_SHORTCUT		2		// g_scShortcuts.Player[bController].aButtons[iIndex]
+#define PB_MOUSELOCK	3		// g_scShortcuts.bMouseLock
+
+// A button assignment read out of the config whose device wasn't connected at the time.
+// We remember what it wanted so that plugging the device in later can still make it work,
+// instead of the user having to restart the emulator.
+typedef struct _PENDINGBIND
+{
+	GUID guidInstance;				// instance GUID the config named (may be stale across replugs)
+	TCHAR szProductName[MAX_PATH];	// product name, which survives a replug where the GUID may not
+	BYTE bProductCounter;			// which of several identically named devices
+	BYTE bKind;						// PB_BUTTON, PB_MODIFIER, PB_SHORTCUT, PB_MOUSELOCK
+	BYTE bController;				// 0..3
+	short iIndex;					// index within aButton[] / pModifiers[] / aButtons[]
+
+	// What the assignment was, so the config writer can tell an assignment that is still
+	// waiting for its device from one the user has since rebound or cleared.
+	BYTE bOffset;
+	BYTE bAxisID;
+	BYTE bBtnType;
+} PENDINGBIND, *LPPENDINGBIND;
 
 int WarningMessage( UINT uTextID, UINT uType );
 int FindDeviceinList( const TCHAR *pszProductName, BYTE bProductCounter, bool fFindSimilar );
