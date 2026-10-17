@@ -3587,7 +3587,8 @@ bool GetButtonText( const BUTTON &btnButton, LPTSTR Buffer )
 	case DT_KEYBUTTON:
 		LoadString( g_hResourceDLL, iDevice[2], Text[0], 16 );
 		//TODO: this is great! can we do this for all of them?
-		if (btnButton.parentDevice->didHandle->GetObjectInfo(&didoi, btnButton.bOffset, DIPH_BYOFFSET) == DI_OK)
+		if (btnButton.parentDevice && btnButton.parentDevice->didHandle
+			&& btnButton.parentDevice->didHandle->GetObjectInfo(&didoi, btnButton.bOffset, DIPH_BYOFFSET) == DI_OK)
 			Text[1] = didoi.tszName;
 		else
 		LoadString( g_hResourceDLL, IDS_C_UNKNOWN, Text[1], 16 );
@@ -4075,6 +4076,12 @@ void UpdateControllerStructures()
 		if (g_pcControllers[i].fPlugged)
 			g_iFirstController = i;
 	}
+
+	// The bindings were just replaced wholesale from the dialog's copy. Anything the user
+	// rebound or cleared must stop waiting for its old device; anything they left alone keeps
+	// waiting, so it still comes alive when that device is plugged in.
+	RevalidatePendingBindings();
+
 	LeaveCriticalSection( &g_critical );
 	return;
 }

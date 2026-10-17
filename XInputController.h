@@ -28,30 +28,12 @@
 #ifndef _XINPUTCONTROLLER_H
 #define _XINPUTCONTROLLER_H
 
-//code from http://msdn.microsoft.com/en-us/library/ee417014(VS.85).aspx
-#include <wbemidl.h>
-#include <oleauto.h>
-#include <set>
-//#include <wmsstd.h> <-- only needed for SAFE_RELEASE(x)
-
-#ifndef SAFE_RELEASE		// when Windows Media Device M? is not present
-#define SAFE_RELEASE(x) \
-   if(x != NULL)        \
-   {                    \
-      x->Release();     \
-      x = NULL;         \
-   }
-#endif
-
-//-----------------------------------------------------------------------------
-// Enum each PNP device using WMI and check each device ID to see if it contains 
-// "IG_" (ex. "VID_045E&PID_028E&IG_00").  If it does, then it's an XInput device
-// Unfortunately this information can not be found by just using DirectInput 
-//-----------------------------------------------------------------------------
-std::set<DWORD> GetXInputDevices(void);
-static inline BOOL IsXInputDevice( std::set<DWORD> devices, const GUID* pGuidProductFromDirectInput )
-{ return devices.find(pGuidProductFromDirectInput->Data1) != devices.end(); }
-//END conde from ...
+// There used to be a WMI query here (GetXInputDevices) that looked for "IG_" in each PNP
+// device ID so XInput pads could be filtered out of the DirectInput device list. It was dead
+// code: the flag that would have run it was never set, so the filter matched nothing and every
+// XInput pad showed up under DirectInput anyway -- which is what existing configs bind against.
+// Removed rather than repaired, because the query is slow enough to be felt at startup and
+// enabling it now would silently break those configs.
 
 /*
 	Xinput header for NRage Plugin, by tecnicors.

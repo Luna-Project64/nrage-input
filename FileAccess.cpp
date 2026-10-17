@@ -32,6 +32,7 @@
 #include "FileAccess.h"
 #include "DirectInput.h"
 #include <string>
+#include <vector>
 using std::string;
 
 #ifndef IDR_PROFILE_DEFAULT1
@@ -46,6 +47,191 @@ using std::string;
 #ifndef IDR_PROFILE_DEFAULT4
 #define IDR_PROFILE_DEFAULT4 -1
 #endif
+
+/////////////////////////////////////////////////////////////////////////////////
+// Pending bindings
+//
+// A BUTTON only remembers a pointer to the DEVICE it came from, so an assignment whose device
+// wasn't plugged in when the config was read used to be thrown away outright -- which is why
+// connecting a controller after the emulator had started meant reconfiguring it by hand (or,
+// more often, restarting the emulator). Now the assignment is kept with a null parentDevice
+// and what it was looking for is recorded here, so RescanInputDevices() can finish the job
+// when the device turns up.
+static std::vector<PENDINGBIND> g_vPendingBinds;
+
+	// Output streams for assignments whose device isn't connected. They have no slot in
+	// g_devList to hang off, so the config writer gives them one block per remembered device.
+struct ORPHANSTREAM
+{
+	GUID guidInstance;
+	TCHAR szProductName[MAX_PATH];
+	BYTE bProductCounter;
+	string strLines;
+};
+static std::vector<ORPHANSTREAM> g_vOrphanStreams;
+
+void ClearPendingBindings()
+{
+	g_vPendingBinds.clear();
+}
+
+static void AddPendingBinding( BYTE bKind, BYTE bController, short iIndex, const BUTTON &btn, REFGUID rGUID, LPCTSTR pszProductName, BYTE bProductCounter )
+{
+	if( btn.bBtnType == DT_UNASSIGNED )
+		return;		// nothing to reconnect; an empty slot doesn't belong to any device
+
+	PENDINGBIND pb;
+	ZeroMemory( &pb, sizeof(pb) );
+
+	pb.bKind = bKind;
+	pb.bController = bController;
+	pb.iIndex = iIndex;
+	pb.guidInstance = rGUID;
+	pb.bProductCounter = bProductCounter;
+	lstrcpyn( pb.szProductName, pszProductName, ARRAYSIZE( pb.szProductName ));
+
+	pb.bOffset = btn.bOffset;
+	pb.bAxisID = btn.bAxisID;
+	pb.bBtnType = btn.bBtnType;
+
+	g_vPendingBinds.push_back( pb );
+
+	DebugWrite( _T("Pending binding: kind %d, controller %d, index %d, device %s %d\n"),
+		bKind, bController, iIndex, pb.szProductName, bProductCounter );
+}
+
+	// Where does this pending binding want to be written?  NULL if it no longer makes sense
+	// (the modifier array shrank, say, because the config was reloaded underneath us).
+static LPBUTTON PendingBindTarget( const PENDINGBIND &pb )
+{
+	switch( pb.bKind )
+	{
+	case PB_BUTTON:
+		if( pb.bController < ARRAYSIZE( g_pcControllers ) && pb.iIndex >= 0 && pb.iIndex < ARRAYSIZE( g_pcControllers[0].aButton ))
+			return &g_pcControllers[pb.bController].aButton[pb.iIndex];
+		break;
+
+	case PB_MODIFIER:
+		if( pb.bController < ARRAYSIZE( g_pcControllers ) && g_pcControllers[pb.bController].pModifiers
+			&& pb.iIndex >= 0 && pb.iIndex < g_pcControllers[pb.bController].nModifiers )
+			return &g_pcControllers[pb.bController].pModifiers[pb.iIndex].btnButton;
+		break;
+
+	case PB_SHORTCUT:
+		if( pb.bController < ARRAYSIZE( g_scShortcuts.Player ) && pb.iIndex >= 0 && pb.iIndex < SC_TOTAL )
+			return &g_scShortcuts.Player[pb.bController].aButtons[pb.iIndex];
+		break;
+
+	case PB_MOUSELOCK:
+		return &g_scShortcuts.bMouseLock;
+	}
+
+	return NULL;
+}
+
+	// Is the assignment this record describes still sitting in that slot, unbound?  False once
+	// the user has rebound or cleared it, at which point the record is just stale.
+static bool PendingBindMatches( const PENDINGBIND &pb, const BUTTON &btn )
+{
+	return !btn.parentDevice
+		&& btn.bBtnType == pb.bBtnType
+		&& btn.bOffset == pb.bOffset
+		&& btn.bAxisID == pb.bAxisID;
+}
+
+// Which device was this slot's assignment waiting on?  NULL if it isn't waiting on one.
+// Used by the config writer so that saving with a controller unplugged doesn't erase it.
+LPPENDINGBIND FindPendingBinding( BYTE bKind, BYTE bController, short iIndex, const BUTTON &btn )
+{
+	for( size_t i = 0; i < g_vPendingBinds.size(); ++i )
+	{
+		PENDINGBIND &pb = g_vPendingBinds[i];
+
+		if( pb.bKind == bKind && pb.bController == bController && pb.iIndex == iIndex
+			&& PendingBindMatches( pb, btn ))
+			return &pb;
+	}
+
+	return NULL;
+}
+
+// Drop records that no longer describe what's in the config.
+// Called after the dialog copies its version over the live one: a slot the user rebound or
+// cleared must not get quietly reattached to its old device when that device turns up.
+void RevalidatePendingBindings()
+{
+	for( size_t i = 0; i < g_vPendingBinds.size(); )
+	{
+		LPBUTTON pTarget = PendingBindTarget( g_vPendingBinds[i] );
+
+		if( pTarget && PendingBindMatches( g_vPendingBinds[i], *pTarget ))
+			++i;
+		else
+			g_vPendingBinds.erase( g_vPendingBinds.begin() + i );
+	}
+}
+
+	// Route a config line for an unbound assignment into a stream of its own, keyed by the
+	// device identity we remembered when the config was read.
+static void AppendOrphanLine( const PENDINGBIND &pb, LPCSTR pszLine )
+{
+	for( size_t i = 0; i < g_vOrphanStreams.size(); ++i )
+	{
+		if( IsEqualGUID( g_vOrphanStreams[i].guidInstance, pb.guidInstance )
+			&& !lstrcmp( g_vOrphanStreams[i].szProductName, pb.szProductName )
+			&& g_vOrphanStreams[i].bProductCounter == pb.bProductCounter )
+		{
+			g_vOrphanStreams[i].strLines.append( pszLine );
+			return;
+		}
+	}
+
+	ORPHANSTREAM os;
+	os.guidInstance = pb.guidInstance;
+	lstrcpyn( os.szProductName, pb.szProductName, ARRAYSIZE( os.szProductName ));
+	os.bProductCounter = pb.bProductCounter;
+	os.strLines.assign( pszLine );
+
+	g_vOrphanStreams.push_back( os );
+}
+
+// Try to bind everything that was waiting on a device that wasn't connected.
+// Returns true if at least one assignment came alive, so the caller knows whether it's worth
+// reinitialising anything downstream.
+bool ResolvePendingBindings()
+{
+	bool fResolved = false;
+
+	for( size_t i = 0; i < g_vPendingBinds.size(); )
+	{
+		const PENDINGBIND &pb = g_vPendingBinds[i];
+
+		// Prefer the exact instance, but fall back to the product name: a controller that
+		// reconnects (particularly over Bluetooth) can come back under a different instance
+		// GUID, and the user still means "that gamepad".
+		int found = FindDeviceinList( pb.guidInstance );
+		if( found == -1 )
+			found = FindDeviceinList( pb.szProductName, pb.bProductCounter, true );
+
+		LPBUTTON pTarget = ( found != -1 ) ? PendingBindTarget( pb ) : NULL;
+
+		if( !pTarget )
+		{
+			++i;
+			continue;
+		}
+
+		pTarget->parentDevice = &g_devList[found];
+		pTarget->fPrevPressed = false;
+		fResolved = true;
+
+		DebugWrite( _T("Resolved pending binding for %s onto device %d\n"), pb.szProductName, found );
+
+		g_vPendingBinds.erase( g_vPendingBinds.begin() + i );
+	}
+
+	return fResolved;
+}
 
 void DumpStreams(FILE * fFile, string strMouse, string strDevs[], string strNull, bool bIsINI);
 void DumpControllerSettings(FILE * fFile, int i, bool bIsINI);
@@ -208,6 +394,13 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 				g_ivConfig->fDisplayShortPop = (atoi(pszLine) != 0);
 			else
 				g_strEmuInfo.fDisplayShortPop = (atoi(pszLine) != 0);
+		break;
+
+	case CHK_SUBFRAMETAPS:
+		// No UI for this one; it's here so the behaviour can be turned off without a rebuild
+		// if it ever feels wrong. See LatchSubFrameTaps() in DirectInput.cpp.
+		if (dwSection == CHK_GENERAL)
+			g_bSubFrameTaps = (atoi(pszLine) != 0);
 		break;
 
 	case CHK_MEMPAK:
@@ -404,6 +597,7 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 		{
 			int controlnum = 0, buttonID = 0;
 			BUTTON btnWorking;
+			bool fDeferred = false;		// device isn't connected; bind it later if it turns up
 
 			ZeroMemory(&btnWorking, sizeof(btnWorking));
 
@@ -457,18 +651,33 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 					}
 					else
 					{
-						DebugWrite(_T("ProcessKey: couldn't find a device in g_devList for %s %d\n"), pszDeviceName, bDeviceNr);
-						gGUID = GUID_NULL;
+						// The device this assignment names isn't connected right now. Keep the
+						// assignment (with no device, so it just reads as unpressed) and note
+						// what it was after, so that plugging the controller in later finishes
+						// the job rather than requiring the emulator to be restarted.
+						// gGUID is deliberately left alone here: the rest of this device's
+						// block needs it to record the same device.
+						DebugWrite(_T("ProcessKey: no device in g_devList for %s %d, deferring binding\n"), pszDeviceName, bDeviceNr);
 						btnWorking.parentDevice = NULL;
-				return false;
+						if (bIsInterface)
+						{
+							gGUID = GUID_NULL;
+							return false;
+						}
+						fDeferred = true;
 					}
 				}
 			}
 
 			if (pShortcuts)
 			{
-				// bounds check on controlnum and buttonID
-				if ( (controlnum == -1 && buttonID != 0) && ((controlnum < 0) || (controlnum > 3) || (buttonID < 0) || (buttonID >= SC_TOTAL)) )
+				// bounds check on controlnum and buttonID.
+				// controlnum -1 is the mouselock shortcut and is the one case where buttonID
+				// is ignored; anything else has to be a real player and a real shortcut slot.
+				// This used to be guarded by "controlnum == -1 && buttonID != 0", which meant
+				// the range check never ran for an out-of-range controlnum and a hand-edited
+				// config could write past the end of g_scShortcuts.Player.
+				if ( controlnum != -1 && ((controlnum < 0) || (controlnum > 3) || (buttonID < 0) || (buttonID >= SC_TOTAL)) )
 				{
 					gGUID = GUID_NULL;	// since we may have cached an invalid GUID, invalidate it
 					return false;
@@ -481,10 +690,17 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 					else
 						g_ivConfig->Shortcuts.Player[controlnum].aButtons[buttonID] = btnWorking;
 				else // if (!bIsInterface)
+				{
 					if (controlnum == -1)
 						g_scShortcuts.bMouseLock = btnWorking;
 					else
 						g_scShortcuts.Player[controlnum].aButtons[buttonID] = btnWorking;
+
+					if (fDeferred)
+						AddPendingBinding( (controlnum == -1) ? PB_MOUSELOCK : PB_SHORTCUT,
+							(BYTE)((controlnum == -1) ? 0 : controlnum), (short)buttonID,
+							btnWorking, gGUID, pszDeviceName, bDeviceNr );
+				}
 			}
 			else // it's a controller button
 			{
@@ -499,7 +715,13 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 				if (bIsInterface)
 					g_ivConfig->Controllers[controlnum].aButton[buttonID] = btnWorking;
 				else
+				{
 					g_pcControllers[controlnum].aButton[buttonID] = btnWorking;
+
+					if (fDeferred)
+						AddPendingBinding( PB_BUTTON, (BYTE)controlnum, (short)buttonID,
+							btnWorking, gGUID, pszDeviceName, bDeviceNr );
+				}
 			}
 		}
 		break;
@@ -510,6 +732,7 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 		{
 			int controlnum = 0;
 			MODIFIER modWorking;
+			bool fDeferred = false;		// device isn't connected; bind it later if it turns up
 
 			ZeroMemory(&modWorking, sizeof(modWorking));
 
@@ -561,10 +784,16 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 					}
 					else
 					{
-						DebugWrite(_T("ProcessKey: couldn't find a device in g_devList for %s %d\n"), pszDeviceName, bDeviceNr);
-						gGUID = GUID_NULL;
+						// See the matching comment in CHK_BUTTON: keep the modifier, remember
+						// the device it wants, and bind it if that device shows up later.
+						DebugWrite(_T("ProcessKey: no device in g_devList for %s %d, deferring modifier\n"), pszDeviceName, bDeviceNr);
 						modWorking.btnButton.parentDevice = NULL;
-					return false;
+						if (bIsInterface)
+						{
+							gGUID = GUID_NULL;
+							return false;
+						}
+						fDeferred = true;
 					}
 				}
 			}
@@ -602,6 +831,11 @@ bool ProcessKey( DWORD dwKey, DWORD dwSection, LPCSTR pszLine, LPTSTR pszFFDevic
 				}
 				g_pcControllers[controlnum].pModifiers[g_pcControllers[controlnum].nModifiers] = modWorking;
 				(g_pcControllers[controlnum].nModifiers)++;
+
+				if (fDeferred)
+					AddPendingBinding( PB_MODIFIER, (BYTE)controlnum,
+						(short)(g_pcControllers[controlnum].nModifiers - 1),
+						modWorking.btnButton, gGUID, pszDeviceName, bDeviceNr );
 			}
 
 		}
@@ -795,6 +1029,19 @@ void FormatShortcutsBlock(FILE * fFile, bool bIsINI)
 							break;
 						}
 			}
+			else if (g_ivConfig->Shortcuts.Player[i].aButtons[j].bBtnType != DT_UNASSIGNED)
+			{
+				// waiting on a device that isn't plugged in: write it back out under that
+				// device rather than dropping it on the floor
+				LPPENDINGBIND pb = FindPendingBinding( PB_SHORTCUT, (BYTE)i, (short)j, g_ivConfig->Shortcuts.Player[i].aButtons[j] );
+
+				if (pb)
+				{
+					char szBuf[DEFAULT_BUFFER];
+					sprintf(szBuf, STRING_INI_BUTTON "=%d %d %02X %d %d\n", i, j, g_ivConfig->Shortcuts.Player[i].aButtons[j].bOffset, g_ivConfig->Shortcuts.Player[i].aButtons[j].bAxisID, g_ivConfig->Shortcuts.Player[i].aButtons[j].bBtnType);
+					AppendOrphanLine(*pb, szBuf);
+				}
+			}
 		} // end buttons for
 	} // end Player for
 
@@ -818,6 +1065,17 @@ void FormatShortcutsBlock(FILE * fFile, bool bIsINI)
 					strDevs[match].append(szBuf);
 					break;
 				}
+	}
+	else if (g_ivConfig->Shortcuts.bMouseLock.bBtnType != DT_UNASSIGNED)
+	{
+		LPPENDINGBIND pb = FindPendingBinding( PB_MOUSELOCK, 0, 0, g_ivConfig->Shortcuts.bMouseLock );
+
+		if (pb)
+		{
+			char szBuf[DEFAULT_BUFFER];
+			sprintf(szBuf, STRING_INI_BUTTON "=%d %d %02X %d %d\n", -1, 0, g_ivConfig->Shortcuts.bMouseLock.bOffset, g_ivConfig->Shortcuts.bMouseLock.bAxisID, g_ivConfig->Shortcuts.bMouseLock.bBtnType);
+			AppendOrphanLine(*pb, szBuf);
+		}
 	} // end shortcuts edge case
 
 	DumpStreams(fFile, strMouse, strDevs, strNull, bIsINI);
@@ -1313,6 +1571,7 @@ bool StoreConfigToINI()
 	fputs("\n[" STRING_INI_GENERAL "]\n", fFile);
 	fprintf(fFile, STRING_INI_LANGUAGE "=%d\n", g_ivConfig->Language);
 	fprintf(fFile, STRING_INI_SHOWMESSAGES "=%d\n", (int)(g_ivConfig->fDisplayShortPop));
+	fprintf(fFile, STRING_INI_SUBFRAMETAPS "=%d\n", (int)g_bSubFrameTaps);
 
 	// Folders
 	fputs("\n[" STRING_INI_FOLDERS "]\n", fFile);
@@ -1417,6 +1676,8 @@ bool LoadConfigFromINI()
 		return false;
 	}
 	
+	ClearPendingBindings();		// whatever was waiting on a device refers to the old bindings
+
 	for (int i = 0; i < 4; i++)
 		SetControllerDefaults( &(g_pcControllers[i]) );
 
@@ -1595,6 +1856,11 @@ void DumpStreams(FILE * fFile, string strMouse, string strDevs[], string strNull
 		fputs("# NOT ASSIGNED\n", fFile);
 		if (bIsINI)
 		{
+			// Blank name and number as well as the null GUID: the reader carries the last
+			// device name it saw across blocks, so without these an unassigned entry would
+			// look like it belonged to whichever device happened to be written before it.
+			fprintf(fFile, STRING_INI_DINPUTNAME "=\n");
+			fprintf(fFile, STRING_INI_DINPUTNR "=00\n");
 			char szGUID[DEFAULT_BUFFER];
 			GUIDtoStringA(szGUID, GUID_NULL);
 			fprintf(fFile, STRING_INI_DINPUTGUID "=%s\n", szGUID);
@@ -1617,6 +1883,12 @@ void DumpStreams(FILE * fFile, string strMouse, string strDevs[], string strNull
 						fprintf(fFile, "# %s %d\n", szANSIBuf, g_devList[i].bProductCounter);
 					else
 						fprintf(fFile, "# %s\n", szANSIBuf);
+					// Name and number first, then the GUID: reading a name or number line
+					// clears the cached GUID, so the GUID has to come last to survive. Both
+					// are written so a controller that comes back under a new instance GUID
+					// (bluetooth does this) can still be matched by name.
+					fprintf(fFile, STRING_INI_DINPUTNAME "=%s\n", szANSIBuf);
+					fprintf(fFile, STRING_INI_DINPUTNR "=%02X\n", g_devList[i].bProductCounter);
 					char szGUID[DEFAULT_BUFFER];
 					GUIDtoStringA(szGUID, g_devList[i].guidInstance);
 					fprintf(fFile, STRING_INI_DINPUTGUID "=%s\n", szGUID);
@@ -1629,6 +1901,34 @@ void DumpStreams(FILE * fFile, string strMouse, string strDevs[], string strNull
 				fputs(strDevs[i].c_str(), fFile);
 			}
 	}
+
+	// Assignments whose device isn't connected. Without this, saving the config while a
+	// controller is unplugged would quietly erase every binding that used it.
+	for (size_t i = 0; i < g_vOrphanStreams.size(); i++)
+	{
+		TCHAR_TO_CHAR( szANSIBuf, g_vOrphanStreams[i].szProductName, DEFAULT_BUFFER );
+		if (bIsINI)
+		{
+			if (g_vOrphanStreams[i].bProductCounter > 0)
+				fprintf(fFile, "# %s %d (not connected)\n", szANSIBuf, g_vOrphanStreams[i].bProductCounter);
+			else
+				fprintf(fFile, "# %s (not connected)\n", szANSIBuf);
+			// written even when blank, so a nameless entry doesn't inherit the previous block's
+			fprintf(fFile, STRING_INI_DINPUTNAME "=%s\n", szANSIBuf);
+			fprintf(fFile, STRING_INI_DINPUTNR "=%02X\n", g_vOrphanStreams[i].bProductCounter);
+			char szGUID[DEFAULT_BUFFER];
+			GUIDtoStringA(szGUID, g_vOrphanStreams[i].guidInstance);
+			fprintf(fFile, STRING_INI_DINPUTGUID "=%s\n", szGUID);
+		}
+		else
+		{
+			fprintf(fFile, STRING_INI_DINPUTNAME "=%s\n", szANSIBuf);
+			fprintf(fFile, STRING_INI_DINPUTNR "=%d\n", g_vOrphanStreams[i].bProductCounter);
+		}
+		fputs(g_vOrphanStreams[i].strLines.c_str(), fFile);
+	}
+
+	g_vOrphanStreams.clear();	// one dump per [section]; don't leak lines into the next one
 }
 
 void FormatControlsBlock(string * strMouse, string strDevs[], string * strNull, int i)
@@ -1661,8 +1961,22 @@ void FormatControlsBlock(string * strMouse, string strDevs[], string * strNull, 
 		}
 		else if (g_ivConfig->Controllers[i].aButton[j].bBtnType != DT_UNASSIGNED)
 		{
-			int k = g_ivConfig->Controllers[i].aButton[j].bBtnType;
-			DebugWriteA("Controller %d button %d is of bBtnType %d but has no parentDevice!\n", i, j, k);
+			// No device: either it's still waiting for one that isn't plugged in, in which
+			// case we write it back out under that device so the assignment survives, or it's
+			// genuinely broken and there's nothing useful we can record.
+			LPPENDINGBIND pb = FindPendingBinding( PB_BUTTON, (BYTE)i, (short)j, g_ivConfig->Controllers[i].aButton[j] );
+
+			if (pb)
+			{
+				char szBuf[DEFAULT_BUFFER];
+				sprintf(szBuf, STRING_INI_BUTTON "=%d %d %02X %d %d\n", i, j, g_ivConfig->Controllers[i].aButton[j].bOffset, g_ivConfig->Controllers[i].aButton[j].bAxisID, g_ivConfig->Controllers[i].aButton[j].bBtnType);
+				AppendOrphanLine(*pb, szBuf);
+			}
+			else
+			{
+				int k = g_ivConfig->Controllers[i].aButton[j].bBtnType;
+				DebugWriteA("Controller %d button %d is of bBtnType %d but has no parentDevice!\n", i, j, k);
+			}
 		}
 	} // end buttons for
 }
@@ -1697,15 +2011,20 @@ void FormatModifiersBlock(string * strMouse, string strDevs[], string * strNull,
 						break;
 					}
 		}
-		else // save modifiers without a keybind
+		else // no device: either waiting on one that isn't plugged in, or genuinely unbound
 		{
 			char szBuf[DEFAULT_BUFFER];
-			// add to the mouse stream
 			sprintf(szBuf, STRING_INI_MODIFIER "=%d %02X %d %d %d %d %d %08X\n", i, g_ivConfig->Controllers[i].pModifiers[j].btnButton.bOffset, 
 				g_ivConfig->Controllers[i].pModifiers[j].btnButton.bAxisID, g_ivConfig->Controllers[i].pModifiers[j].btnButton.bBtnType,
 				g_ivConfig->Controllers[i].pModifiers[j].bModType, g_ivConfig->Controllers[i].pModifiers[j].fToggle,
 				g_ivConfig->Controllers[i].pModifiers[j].fStatus, g_ivConfig->Controllers[i].pModifiers[j].dwSpecific);
-			strNull->append(szBuf);
+
+			LPPENDINGBIND pb = FindPendingBinding( PB_MODIFIER, (BYTE)i, (short)j, g_ivConfig->Controllers[i].pModifiers[j].btnButton );
+
+			if (pb)
+				AppendOrphanLine(*pb, szBuf);
+			else
+				strNull->append(szBuf);
 		}
 	}
 }

@@ -212,11 +212,19 @@ EXPORT void CALL DllConfig ( HWND hParent )
 		{
 			EnterCriticalSection ( &g_critical );
 			InitMouse();
-			MakeDeviceCtx ctx;
-			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, &ctx, DIEDFL_ATTACHEDONLY );
+			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, NULL, DIEDFL_ATTACHEDONLY );
 			LeaveCriticalSection ( &g_critical );
 			DebugWriteA("InitDirectInput run in DllConfig, g_nDevices=%d\n", g_nDevices);
 		}
+	}
+	else
+	{
+		// Pick up anything plugged in since we last looked, so the dialog's device lists are
+		// current. The hotplug watcher normally handles this from the emulation thread, but
+		// that isn't running when the user opens this from the emulator's menu with no ROM.
+		EnterCriticalSection ( &g_critical );
+		RescanInputDevices();
+		LeaveCriticalSection ( &g_critical );
 	}
 
 	if( g_pDIHandle && !g_bConfiguring )
@@ -343,14 +351,17 @@ EXPORT void CALL InitiateControllers (CONTROL_INFO ControlInfo)
 		{
 			EnterCriticalSection ( &g_critical );
 			InitMouse();
-			MakeDeviceCtx ctx;
-			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, &ctx, DIEDFL_ATTACHEDONLY );
+			g_pDIHandle->EnumDevices( DI8DEVCLASS_ALL, EnumMakeDeviceList, NULL, DIEDFL_ATTACHEDONLY );
 			LeaveCriticalSection ( &g_critical );
 			DebugWriteA("InitDirectInput run in InitiateControllers, g_nDevices=%d\n", g_nDevices);
 		}
 		else
 			return;
 	}
+
+	// Watch for controllers arriving or leaving from here on. Without this the device list is
+	// frozen at whatever was connected when the ROM was loaded.
+	StartDeviceWatcher();
 
 	int iDevice;
 
@@ -791,7 +802,8 @@ EXPORT void CALL CloseDLL (void)
 	}
 
 	// ZeroMemory( g_pcControllers, sizeof(g_pcControllers) ); // why zero the memory if we're just going to close down?
-	
+
+	StopDeviceWatcher();	// must go before FreeDirectInput: it can trigger a rescan
 	FreeDirectInput();
 
 	return;

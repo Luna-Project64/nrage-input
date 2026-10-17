@@ -47,6 +47,12 @@ bool ReadMemPakFile( LPTSTR pszMemPakFile, BYTE *aMemPak, bool fCreate );
 bool WriteMemPakFile( LPTSTR pszMemPakFile, BYTE *aMemPak, bool fCreate );
 bool LoadProfileFromResource( int indexController, bool bIsInterface );
 bool LoadShortcutsFromResource( bool bIsInterface );
+
+	// Assignments whose device wasn't connected when the config was read. See PENDINGBIND.
+void ClearPendingBindings();
+bool ResolvePendingBindings();
+void RevalidatePendingBindings();
+LPPENDINGBIND FindPendingBinding( BYTE bKind, BYTE bController, short iIndex, const BUTTON &btn );
 inline void GUIDtoStringA( char * szGUIDbuf, const GUID guid );
 inline bool StringtoGUIDA( LPGUID guid, const char * szGUIDbuf );
 unsigned long djbHash(const char *str);
@@ -75,6 +81,7 @@ unsigned long djbHash(const char *str);
 
 #define STRING_INI_LANGUAGE		"Language"
 #define STRING_INI_SHOWMESSAGES	"ShowMessages"
+#define STRING_INI_SUBFRAMETAPS	"SubFrameTaps"
 
 #define STRING_INI_BRPROFILE	"Profile"
 #define STRING_INI_BRNOTE		"Note"
@@ -144,6 +151,8 @@ unsigned long djbHash(const char *str);
 // assignments (to the left of the '=' sign)
 #define CHK_LANGUAGE		3857633481
 #define CHK_SHOWMESSAGES	638097246
+	// djbHash("SUBFRAMETAPS") -- ParseLine uppercases the key before hashing it
+#define CHK_SUBFRAMETAPS	1432299922
 
 #define CHK_MEMPAK			3230166560
 #define CHK_GBXROM			2992194388
